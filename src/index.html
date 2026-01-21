@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Library Management System</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <header class="header">
+        <h1>📚 University Library Management System</h1>
+        <div class="header-stats" id="headerStats">
+          <div class="stat-card">
+            <div class="stat-value" id="totalStudents">0</div>
+            <div class="stat-label">Total Students</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="totalBooks">0</div>
+            <div class="stat-label">Total Books</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="availableCopies">0</div>
+            <div class="stat-label">Available Copies</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="issuedBooks">0</div>
+            <div class="stat-label">Issued Books</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Navigation Tabs -->
+      <div class="tabs">
+        <button class="tab-button active" onclick="showTab('dashboard')">
+          Dashboard
+        </button>
+        <button class="tab-button" onclick="showTab('students')">
+          Students
+        </button>
+        <button class="tab-button" onclick="showTab('books')">Books</button>
+      </div>
+
+      <!-- Dashboard Tab -->
+      <div id="dashboard" class="tab-content active">
+        <h2>Dashboard Overview</h2>
+        <div class="dashboard-grid">
+          <div class="dashboard-section">
+            <h3>Recent Students</h3>
+            <div id="recentStudents" class="dashboard-list"></div>
+          </div>
+          <div class="dashboard-section">
+            <h3>Recent Books</h3>
+            <div id="recentBooks" class="dashboard-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Students Tab -->
+      <div id="students" class="tab-content">
+        <div class="section-header">
+          <h2>Student Management</h2>
+          <button class="btn btn-primary" onclick="showAddStudentForm()">
+            + Add Student
+          </button>
+        </div>
+
+        <!-- Add Student Form -->
+        <div id="addStudentForm" class="form-container" style="display: none">
+          <h3>Add New Student</h3>
+          <form onsubmit="addStudent(event)">
+            <div class="form-grid">
+              <input
+                type="text"
+                id="studentId"
+                placeholder="Student ID *"
+                required
+              />
+              <input
+                type="text"
+                id="studentName"
+                placeholder="Full Name *"
+                required
+              />
+              <input
+                type="email"
+                id="studentEmail"
+                placeholder="Email *"
+                required
+              />
+              <input type="tel" id="studentPhone" placeholder="Phone Number" />
+              <input
+                type="text"
+                id="studentDepartment"
+                placeholder="Department"
+              />
+              <select id="studentYear">
+                <option value="">Select Year</option>
+                <option value="1st Year">1st Year</option>
+                <option value="2nd Year">2nd Year</option>
+                <option value="3rd Year">3rd Year</option>
+                <option value="4th Year">4th Year</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">
+                Save Student
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onclick="hideAddStudentForm()"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Students Table -->
+        <div class="table-container">
+          <input
+            type="text"
+            id="studentSearch"
+            class="search-input"
+            placeholder="Search students..."
+            onkeyup="filterStudents()"
+          />
+          <table id="studentsTable">
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Department</th>
+                <th>Year</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="studentsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Books Tab -->
+      <div id="books" class="tab-content">
+        <div class="section-header">
+          <h2>Book Management</h2>
+          <button class="btn btn-primary" onclick="showAddBookForm()">
+            + Add Book
+          </button>
+        </div>
+
+        <!-- Add Book Form -->
+        <div id="addBookForm" class="form-container" style="display: none">
+          <h3>Add New Book</h3>
+          <form onsubmit="addBook(event)">
+            <div class="form-grid">
+              <input type="text" id="bookIsbn" placeholder="ISBN *" required />
+              <input
+                type="text"
+                id="bookTitle"
+                placeholder="Book Title *"
+                required
+              />
+              <input
+                type="text"
+                id="bookAuthor"
+                placeholder="Author *"
+                required
+              />
+              <input type="text" id="bookPublisher" placeholder="Publisher" />
+              <input type="text" id="bookCategory" placeholder="Category" />
+              <input
+                type="number"
+                id="bookTotalCopies"
+                placeholder="Total Copies *"
+                min="1"
+                required
+              />
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save Book</button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onclick="hideAddBookForm()"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Books Table -->
+        <div class="table-container">
+          <input
+            type="text"
+            id="bookSearch"
+            class="search-input"
+            placeholder="Search books..."
+            onkeyup="filterBooks()"
+          />
+          <table id="booksTable">
+            <thead>
+              <tr>
+                <th>ISBN</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Publisher</th>
+                <th>Category</th>
+                <th>Total Copies</th>
+                <th>Available</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="booksTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

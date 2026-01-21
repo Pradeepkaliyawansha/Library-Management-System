@@ -1,0 +1,44 @@
+{
+  "name": "library-management-system",
+  "version": "1.0.0",
+  "description": "University Library Management System",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win --x64"
+  },
+  "keywords": [
+    "library",
+    "management",
+    "university"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "sql.js": "^1.8.0"
+  },
+  "build": {
+    "appId": "com.university.library",
+    "productName": "Library Management System",
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "files": [
+      "src/**/*",
+      "database.js",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron-rebuild": "^3.2.9"
+  }
+}
