@@ -59,6 +59,7 @@ async function initDatabase() {
         student_id TEXT NOT NULL,
         isbn TEXT NOT NULL,
         issue_date TEXT DEFAULT CURRENT_TIMESTAMP,
+        due_date TEXT,
         return_date TEXT,
         status TEXT DEFAULT 'issued',
         FOREIGN KEY (student_id) REFERENCES students(student_id),
@@ -258,6 +259,177 @@ ipcMain.handle("delete-book", (event, isbn) => {
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
+  }
+});
+
+// Transactions - Issue Book
+ipcMain.handle("issue-book", (event, transaction) => {
+  try {
+    // Check if book is available
+    const bookResult = db.exec(
+      "SELECT available_copies FROM books WHERE isbn = ?",
+      [transaction.isbn],
+    );
+
+    if (bookResult.length === 0 || bookResult[0].values.length === 0) {
+      return { success: false, error: "Book not found" };
+    }
+
+    const availableCopies = bookResult[0].values[0][0];
+
+    if (availableCopies <= 0) {
+      return { success: false, error: "No copies available" };
+    }
+
+    // Check if student exists
+    const studentResult = db.exec(
+      "SELECT student_id FROM students WHERE student_id = ?",
+      [transaction.student_id],
+    );
+
+    if (studentResult.length === 0 || studentResult[0].values.length === 0) {
+      return { success: false, error: "Student not found" };
+    }
+
+    // Calculate due date (14 days from now)
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 14);
+    const dueDateStr = dueDate.toISOString();
+
+    // Insert transaction
+    db.run(
+      `INSERT INTO transactions (student_id, isbn, due_date, status)
+       VALUES (?, ?, ?, 'issued')`,
+      [transaction.student_id, transaction.isbn, dueDateStr],
+    );
+
+    // Update available copies
+    db.run(
+      "UPDATE books SET available_copies = available_copies - 1 WHERE isbn = ?",
+      [transaction.isbn],
+    );
+
+    saveDatabase();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Transactions - Return Book
+ipcMain.handle("return-book", (event, transactionId) => {
+  try {
+    // Get transaction details
+    const transResult = db.exec(
+      "SELECT isbn, status FROM transactions WHERE id = ?",
+      [transactionId],
+    );
+
+    if (transResult.length === 0 || transResult[0].values.length === 0) {
+      return { success: false, error: "Transaction not found" };
+    }
+
+    const isbn = transResult[0].values[0][0];
+    const status = transResult[0].values[0][1];
+
+    if (status === "returned") {
+      return { success: false, error: "Book already returned" };
+    }
+
+    // Update transaction
+    db.run(
+      `UPDATE transactions SET status = 'returned', return_date = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [transactionId],
+    );
+
+    // Update available copies
+    db.run(
+      "UPDATE books SET available_copies = available_copies + 1 WHERE isbn = ?",
+      [isbn],
+    );
+
+    saveDatabase();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Get all transactions
+ipcMain.handle("get-transactions", () => {
+  try {
+    const result = db.exec(`
+      SELECT 
+        t.id,
+        t.student_id,
+        s.name as student_name,
+        t.isbn,
+        b.title as book_title,
+        t.issue_date,
+        t.due_date,
+        t.return_date,
+        t.status
+      FROM transactions t
+      LEFT JOIN students s ON t.student_id = s.student_id
+      LEFT JOIN books b ON t.isbn = b.isbn
+      ORDER BY t.issue_date DESC
+    `);
+
+    if (result.length === 0) return [];
+
+    const columns = result[0].columns;
+    const values = result[0].values;
+
+    return values.map((row) => {
+      const obj = {};
+      columns.forEach((col, idx) => {
+        obj[col] = row[idx];
+      });
+      return obj;
+    });
+  } catch (error) {
+    console.error("Error getting transactions:", error);
+    return [];
+  }
+});
+
+// Get student's borrowed books
+ipcMain.handle("get-student-books", (event, studentId) => {
+  try {
+    const result = db.exec(
+      `
+      SELECT 
+        t.id,
+        t.isbn,
+        b.title,
+        b.author,
+        t.issue_date,
+        t.due_date,
+        t.status
+      FROM transactions t
+      LEFT JOIN books b ON t.isbn = b.isbn
+      WHERE t.student_id = ? AND t.status = 'issued'
+      ORDER BY t.issue_date DESC
+    `,
+      [studentId],
+    );
+
+    if (result.length === 0) return [];
+
+    const columns = result[0].columns;
+    const values = result[0].values;
+
+    return values.map((row) => {
+      const obj = {};
+      columns.forEach((col, idx) => {
+        obj[col] = row[idx];
+      });
+      return obj;
+    });
+  } catch (error) {
+    console.error("Error getting student books:", error);
+    return [];
   }
 });
 

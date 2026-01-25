@@ -40,6 +40,9 @@
           Students
         </button>
         <button class="tab-button" onclick="showTab('books')">Books</button>
+        <button class="tab-button" onclick="showTab('transactions')">
+          Transactions
+        </button>
       </div>
 
       <!-- Dashboard Tab -->
@@ -219,6 +222,67 @@
             <tbody id="booksTableBody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Transactions Tab -->
+      <div id="transactions" class="tab-content">
+        <div class="section-header">
+          <h2>Book Transactions</h2>
+        </div>
+
+        <!-- Transactions Table -->
+        <div class="table-container">
+          <input
+            type="text"
+            id="transactionSearch"
+            class="search-input"
+            placeholder="Search transactions..."
+            onkeyup="filterTransactions()"
+          />
+          <table id="transactionsTable">
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Student Name</th>
+                <th>Book Title</th>
+                <th>Issue Date</th>
+                <th>Due Date</th>
+                <th>Return Date</th>
+                <th>Status / Actions</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Issue Book Modal -->
+    <div id="issueBookModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <h3 id="issueBookTitle">Issue Book</h3>
+        <form id="issueBookForm" onsubmit="issueBook(event)">
+          <input type="hidden" id="issueBookIsbn" />
+          <div class="form-group">
+            <label for="issueStudentId">Student ID *</label>
+            <input
+              type="text"
+              id="issueStudentId"
+              placeholder="Enter Student ID"
+              required
+            />
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Issue Book</button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              onclick="hideIssueBookModal()"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 

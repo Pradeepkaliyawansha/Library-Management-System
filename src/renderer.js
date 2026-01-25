@@ -2,6 +2,7 @@ const { ipcRenderer } = require("electron");
 
 let studentsData = [];
 let booksData = [];
+let transactionsData = [];
 
 // Initialize application
 document.addEventListener("DOMContentLoaded", () => {
@@ -12,6 +13,7 @@ async function loadAllData() {
   await loadStatistics();
   await loadStudents();
   await loadBooks();
+  await loadTransactions();
   updateDashboard();
 }
 
@@ -101,6 +103,7 @@ function displayStudents(students) {
             <td>${student.department || "N/A"}</td>
             <td>${student.year || "N/A"}</td>
             <td>
+                <button class="btn-small btn-info" onclick="viewStudentBooks('${student.student_id}')">Books</button>
                 <button class="btn-small btn-danger" onclick="deleteStudent('${student.student_id}')">Delete</button>
             </td>
         </tr>
@@ -167,6 +170,28 @@ async function deleteStudent(studentId) {
   }
 }
 
+async function viewStudentBooks(studentId) {
+  const books = await ipcRenderer.invoke("get-student-books", studentId);
+  const student = studentsData.find((s) => s.student_id === studentId);
+
+  let message = `Books borrowed by ${student.name} (${studentId}):\n\n`;
+
+  if (books.length === 0) {
+    message += "No books currently borrowed.";
+  } else {
+    books.forEach((book, index) => {
+      const issueDate = new Date(book.issue_date).toLocaleDateString();
+      const dueDate = new Date(book.due_date).toLocaleDateString();
+      message += `${index + 1}. ${book.title} by ${book.author}\n`;
+      message += `   ISBN: ${book.isbn}\n`;
+      message += `   Issue Date: ${issueDate}\n`;
+      message += `   Due Date: ${dueDate}\n\n`;
+    });
+  }
+
+  alert(message);
+}
+
 // Books Management
 async function loadBooks() {
   booksData = await ipcRenderer.invoke("get-books");
@@ -194,6 +219,7 @@ function displayBooks(books) {
             <td>${book.total_copies}</td>
             <td>${book.available_copies}</td>
             <td>
+                <button class="btn-small btn-success" onclick="showIssueBookModal('${book.isbn}')" ${book.available_copies <= 0 ? "disabled" : ""}>Issue</button>
                 <button class="btn-small btn-danger" onclick="deleteBook('${book.isbn}')">Delete</button>
             </td>
         </tr>
@@ -256,6 +282,109 @@ async function deleteBook(isbn) {
     const result = await ipcRenderer.invoke("delete-book", isbn);
     if (result.success) {
       alert("Book deleted successfully!");
+      loadAllData();
+    } else {
+      alert("Error: " + result.error);
+    }
+  }
+}
+
+// Issue Book Modal
+function showIssueBookModal(isbn) {
+  const book = booksData.find((b) => b.isbn === isbn);
+  document.getElementById("issueBookIsbn").value = isbn;
+  document.getElementById("issueBookTitle").textContent =
+    `Issue: ${book.title}`;
+  document.getElementById("issueBookModal").style.display = "block";
+}
+
+function hideIssueBookModal() {
+  document.getElementById("issueBookModal").style.display = "none";
+  document.getElementById("issueBookForm").reset();
+}
+
+async function issueBook(event) {
+  event.preventDefault();
+
+  const transaction = {
+    student_id: document.getElementById("issueStudentId").value,
+    isbn: document.getElementById("issueBookIsbn").value,
+  };
+
+  const result = await ipcRenderer.invoke("issue-book", transaction);
+
+  if (result.success) {
+    alert("Book issued successfully!");
+    hideIssueBookModal();
+    loadAllData();
+  } else {
+    alert("Error: " + result.error);
+  }
+}
+
+// Transactions Management
+async function loadTransactions() {
+  transactionsData = await ipcRenderer.invoke("get-transactions");
+  displayTransactions(transactionsData);
+}
+
+function displayTransactions(transactions) {
+  const tbody = document.getElementById("transactionsTableBody");
+
+  if (transactions.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="7" style="text-align: center;">No transactions found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = transactions
+    .map((t) => {
+      const issueDate = new Date(t.issue_date).toLocaleDateString();
+      const dueDate = t.due_date
+        ? new Date(t.due_date).toLocaleDateString()
+        : "N/A";
+      const returnDate = t.return_date
+        ? new Date(t.return_date).toLocaleDateString()
+        : "-";
+      const isOverdue =
+        t.status === "issued" && new Date(t.due_date) < new Date();
+
+      return `
+        <tr class="${isOverdue ? "overdue-row" : ""}">
+            <td>${t.student_id}</td>
+            <td>${t.student_name || "N/A"}</td>
+            <td>${t.book_title || "N/A"}</td>
+            <td>${issueDate}</td>
+            <td>${dueDate}</td>
+            <td>${returnDate}</td>
+            <td>
+                <span class="status-badge status-${t.status}">${t.status.toUpperCase()}</span>
+                ${t.status === "issued" ? `<button class="btn-small btn-warning" onclick="returnBook(${t.id})">Return</button>` : ""}
+            </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function filterTransactions() {
+  const searchTerm = document
+    .getElementById("transactionSearch")
+    .value.toLowerCase();
+  const filtered = transactionsData.filter(
+    (t) =>
+      t.student_id.toLowerCase().includes(searchTerm) ||
+      (t.student_name && t.student_name.toLowerCase().includes(searchTerm)) ||
+      (t.book_title && t.book_title.toLowerCase().includes(searchTerm)),
+  );
+  displayTransactions(filtered);
+}
+
+async function returnBook(transactionId) {
+  if (confirm("Mark this book as returned?")) {
+    const result = await ipcRenderer.invoke("return-book", transactionId);
+    if (result.success) {
+      alert("Book returned successfully!");
       loadAllData();
     } else {
       alert("Error: " + result.error);
