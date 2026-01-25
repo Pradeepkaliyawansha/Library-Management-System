@@ -69,9 +69,9 @@
           </button>
         </div>
 
-        <!-- Add Student Form -->
+        <!-- Add/Edit Student Form -->
         <div id="addStudentForm" class="form-container" style="display: none">
-          <h3>Add New Student</h3>
+          <h3 id="studentFormTitle">Add New Student</h3>
           <form onsubmit="addStudent(event)">
             <div class="form-grid">
               <input
@@ -156,9 +156,9 @@
           </button>
         </div>
 
-        <!-- Add Book Form -->
+        <!-- Add/Edit Book Form -->
         <div id="addBookForm" class="form-container" style="display: none">
-          <h3>Add New Book</h3>
+          <h3 id="bookFormTitle">Add New Book</h3>
           <form onsubmit="addBook(event)">
             <div class="form-grid">
               <input type="text" id="bookIsbn" placeholder="ISBN *" required />
