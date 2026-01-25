@@ -67,6 +67,22 @@ async function initDatabase() {
       );
     `);
 
+    // Check if due_date column exists, if not add it (for database migration)
+    try {
+      const checkColumn = db.exec("PRAGMA table_info(transactions)");
+      if (checkColumn.length > 0) {
+        const columns = checkColumn[0].values.map((row) => row[1]); // Get column names
+        if (!columns.includes("due_date")) {
+          console.log(
+            "Adding missing due_date column to transactions table...",
+          );
+          db.run("ALTER TABLE transactions ADD COLUMN due_date TEXT");
+        }
+      }
+    } catch (error) {
+      console.log("Column check/migration:", error.message);
+    }
+
     // Save database
     saveDatabase();
     console.log("Database initialized successfully");
