@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const initSqlJs = require("sql.js");
@@ -491,6 +491,163 @@ ipcMain.handle("get-statistics", () => {
       availableCopies: 0,
       issuedBooks: 0,
     };
+  }
+});
+
+// Excel Export Handler
+ipcMain.handle("export-to-excel", async (event, { type, data }) => {
+  try {
+    const ExcelJS = require("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(type);
+
+    // Set worksheet properties
+    worksheet.properties.defaultRowHeight = 20;
+
+    let columns = [];
+    let title = "";
+
+    // Configure columns based on type
+    if (type === "Students") {
+      title = "Students Report";
+      columns = [
+        { header: "Student ID", key: "student_id", width: 15 },
+        { header: "Name", key: "name", width: 25 },
+        { header: "Email", key: "email", width: 30 },
+        { header: "Phone", key: "phone", width: 15 },
+        { header: "Department", key: "department", width: 20 },
+        { header: "Year", key: "year", width: 12 },
+        { header: "Created At", key: "created_at", width: 20 },
+      ];
+    } else if (type === "Books") {
+      title = "Books Report";
+      columns = [
+        { header: "ISBN", key: "isbn", width: 15 },
+        { header: "Title", key: "title", width: 35 },
+        { header: "Author", key: "author", width: 25 },
+        { header: "Publisher", key: "publisher", width: 25 },
+        { header: "Category", key: "category", width: 20 },
+        { header: "Total Copies", key: "total_copies", width: 15 },
+        { header: "Available Copies", key: "available_copies", width: 18 },
+        { header: "Created At", key: "created_at", width: 20 },
+      ];
+    } else if (type === "Transactions") {
+      title = "Transactions Report";
+      columns = [
+        { header: "Transaction ID", key: "id", width: 15 },
+        { header: "Student ID", key: "student_id", width: 15 },
+        { header: "Student Name", key: "student_name", width: 25 },
+        { header: "ISBN", key: "isbn", width: 15 },
+        { header: "Book Title", key: "book_title", width: 35 },
+        { header: "Issue Date", key: "issue_date", width: 20 },
+        { header: "Due Date", key: "due_date", width: 20 },
+        { header: "Return Date", key: "return_date", width: 20 },
+        { header: "Status", key: "status", width: 12 },
+      ];
+    }
+
+    // Add title row
+    worksheet.mergeCells("A1", String.fromCharCode(64 + columns.length) + "1");
+    const titleCell = worksheet.getCell("A1");
+    titleCell.value = title;
+    titleCell.font = { size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+    titleCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF667EEA" },
+    };
+    titleCell.alignment = { vertical: "middle", horizontal: "center" };
+    worksheet.getRow(1).height = 30;
+
+    // Add export date
+    worksheet.mergeCells("A2", String.fromCharCode(64 + columns.length) + "2");
+    const dateCell = worksheet.getCell("A2");
+    dateCell.value = `Generated on: ${new Date().toLocaleString()}`;
+    dateCell.font = { size: 10, italic: true };
+    dateCell.alignment = { horizontal: "center" };
+
+    // Set columns (starting from row 3)
+    worksheet.columns = columns;
+
+    // Style header row
+    const headerRow = worksheet.getRow(3);
+    columns.forEach((col, index) => {
+      const cell = headerRow.getCell(index + 1);
+      cell.value = col.header;
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF764BA2" },
+      };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+    headerRow.height = 25;
+
+    // Add data rows
+    data.forEach((item, index) => {
+      const row = worksheet.addRow(item);
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE0E0E0" } },
+          left: { style: "thin", color: { argb: "FFE0E0E0" } },
+          bottom: { style: "thin", color: { argb: "FFE0E0E0" } },
+          right: { style: "thin", color: { argb: "FFE0E0E0" } },
+        };
+        cell.alignment = { vertical: "middle" };
+      });
+
+      // Alternate row coloring
+      if (index % 2 === 0) {
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFF8F9FA" },
+          };
+        });
+      }
+    });
+
+    // Add summary row for certain types
+    if (type === "Books" || type === "Transactions") {
+      worksheet.addRow([]);
+      const summaryRow = worksheet.addRow(["Total Records:", data.length]);
+      summaryRow.font = { bold: true };
+      summaryRow.getCell(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFEB3B" },
+      };
+      summaryRow.getCell(2).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFEB3B" },
+      };
+    }
+
+    // Show save dialog
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: `Export ${type} to Excel`,
+      defaultPath: `library_${type.toLowerCase()}_${new Date().toISOString().split("T")[0]}.xlsx`,
+      filters: [{ name: "Excel Files", extensions: ["xlsx"] }],
+    });
+
+    if (!result.canceled && result.filePath) {
+      await workbook.xlsx.writeFile(result.filePath);
+      return { success: true, filePath: result.filePath };
+    }
+
+    return { success: false, error: "Export cancelled" };
+  } catch (error) {
+    console.error("Error exporting to Excel:", error);
+    return { success: false, error: error.message };
   }
 });
 

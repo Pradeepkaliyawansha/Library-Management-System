@@ -79,6 +79,90 @@ function updateDashboard() {
       : "<p>No books added yet.</p>";
 }
 
+// Excel Export Functions
+async function exportStudentsToExcel() {
+  if (studentsData.length === 0) {
+    alert("No students to export!");
+    return;
+  }
+
+  const result = await ipcRenderer.invoke("export-to-excel", {
+    type: "Students",
+    data: studentsData.map((s) => ({
+      student_id: s.student_id,
+      name: s.name,
+      email: s.email,
+      phone: s.phone || "N/A",
+      department: s.department || "N/A",
+      year: s.year || "N/A",
+      created_at: new Date(s.created_at).toLocaleDateString(),
+    })),
+  });
+
+  if (result.success) {
+    alert(`Students exported successfully to:\n${result.filePath}`);
+  } else if (result.error !== "Export cancelled") {
+    alert(`Error exporting: ${result.error}`);
+  }
+}
+
+async function exportBooksToExcel() {
+  if (booksData.length === 0) {
+    alert("No books to export!");
+    return;
+  }
+
+  const result = await ipcRenderer.invoke("export-to-excel", {
+    type: "Books",
+    data: booksData.map((b) => ({
+      isbn: b.isbn,
+      title: b.title,
+      author: b.author,
+      publisher: b.publisher || "N/A",
+      category: b.category || "N/A",
+      total_copies: b.total_copies,
+      available_copies: b.available_copies,
+      created_at: new Date(b.created_at).toLocaleDateString(),
+    })),
+  });
+
+  if (result.success) {
+    alert(`Books exported successfully to:\n${result.filePath}`);
+  } else if (result.error !== "Export cancelled") {
+    alert(`Error exporting: ${result.error}`);
+  }
+}
+
+async function exportTransactionsToExcel() {
+  if (transactionsData.length === 0) {
+    alert("No transactions to export!");
+    return;
+  }
+
+  const result = await ipcRenderer.invoke("export-to-excel", {
+    type: "Transactions",
+    data: transactionsData.map((t) => ({
+      id: t.id,
+      student_id: t.student_id,
+      student_name: t.student_name || "N/A",
+      isbn: t.isbn,
+      book_title: t.book_title || "N/A",
+      issue_date: new Date(t.issue_date).toLocaleDateString(),
+      due_date: t.due_date ? new Date(t.due_date).toLocaleDateString() : "N/A",
+      return_date: t.return_date
+        ? new Date(t.return_date).toLocaleDateString()
+        : "Not Returned",
+      status: t.status.toUpperCase(),
+    })),
+  });
+
+  if (result.success) {
+    alert(`Transactions exported successfully to:\n${result.filePath}`);
+  } else if (result.error !== "Export cancelled") {
+    alert(`Error exporting: ${result.error}`);
+  }
+}
+
 // Students Management
 async function loadStudents() {
   studentsData = await ipcRenderer.invoke("get-students");

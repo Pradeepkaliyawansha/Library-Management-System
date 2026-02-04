@@ -153,6 +153,12 @@ body {
   gap: 10px;
 }
 
+.button-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* Forms */
 .form-container {
   background: #f8f9fa;
@@ -443,5 +449,13 @@ tbody tr.overdue-row:hover {
 
   .tab-button {
     width: 100%;
+  }
+
+  .button-group {
+    width: 100%;
+  }
+
+  .button-group .btn {
+    flex: 1;
   }
 }

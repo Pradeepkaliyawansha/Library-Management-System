@@ -64,9 +64,14 @@
       <div id="students" class="tab-content">
         <div class="section-header">
           <h2>Student Management</h2>
-          <button class="btn btn-primary" onclick="showAddStudentForm()">
-            + Add Student
-          </button>
+          <div class="button-group">
+            <button class="btn btn-success" onclick="exportStudentsToExcel()">
+              📊 Export to Excel
+            </button>
+            <button class="btn btn-primary" onclick="showAddStudentForm()">
+              + Add Student
+            </button>
+          </div>
         </div>
 
         <!-- Add/Edit Student Form -->
@@ -151,9 +156,14 @@
       <div id="books" class="tab-content">
         <div class="section-header">
           <h2>Book Management</h2>
-          <button class="btn btn-primary" onclick="showAddBookForm()">
-            + Add Book
-          </button>
+          <div class="button-group">
+            <button class="btn btn-success" onclick="exportBooksToExcel()">
+              📊 Export to Excel
+            </button>
+            <button class="btn btn-primary" onclick="showAddBookForm()">
+              + Add Book
+            </button>
+          </div>
         </div>
 
         <!-- Add/Edit Book Form -->
@@ -228,6 +238,9 @@
       <div id="transactions" class="tab-content">
         <div class="section-header">
           <h2>Book Transactions</h2>
+          <button class="btn btn-success" onclick="exportTransactionsToExcel()">
+            📊 Export to Excel
+          </button>
         </div>
 
         <!-- Transactions Table -->
