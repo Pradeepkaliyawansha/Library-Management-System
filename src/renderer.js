@@ -9,7 +9,66 @@ let editingBook = null;
 // Initialize application
 document.addEventListener("DOMContentLoaded", () => {
   loadAllData();
+  setupUpdateListeners();
 });
+
+// Setup update listeners
+function setupUpdateListeners() {
+  // Listen for export triggers from menu
+  ipcRenderer.on("export-students", () => {
+    exportStudentsToExcel();
+  });
+
+  ipcRenderer.on("export-books", () => {
+    exportBooksToExcel();
+  });
+
+  ipcRenderer.on("export-transactions", () => {
+    exportTransactionsToExcel();
+  });
+
+  // Listen for update progress
+  ipcRenderer.on("update-downloading", () => {
+    showUpdateNotification("Downloading update...");
+  });
+
+  ipcRenderer.on("update-progress", (event, progressObj) => {
+    const percent = Math.round(progressObj.percent);
+    showUpdateNotification(`Downloading update: ${percent}%`);
+  });
+}
+
+function showUpdateNotification(message) {
+  // Create a simple notification div
+  const existingNotif = document.getElementById("updateNotification");
+  if (existingNotif) {
+    existingNotif.remove();
+  }
+
+  const notification = document.createElement("div");
+  notification.id = "updateNotification";
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    z-index: 10000;
+    font-weight: 600;
+  `;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+
+  // Auto-remove after 5 seconds if it's not a progress update
+  if (!message.includes("%")) {
+    setTimeout(() => {
+      notification.remove();
+    }, 5000);
+  }
+}
 
 async function loadAllData() {
   await loadStatistics();
