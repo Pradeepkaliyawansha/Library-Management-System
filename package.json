@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build-win": "electron-builder --win --x64"
+    "build-win": "electron-builder --win --x64",
+    "publish": "electron-builder --win --x64 --publish always"
   },
   "keywords": [
     "library",
