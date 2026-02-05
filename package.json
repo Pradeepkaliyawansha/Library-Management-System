@@ -13,11 +13,9 @@
     "management",
     "university"
   ],
-  "author": "Your Name",
+  "author": "Pradeep Kaliyawansha",
   "license": "MIT",
   "dependencies": {
-    "electron": "^40.0.0",
-    "electron-builder": "^26.4.0",
     "exceljs": "^4.4.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -40,6 +38,8 @@
     }
   },
   "devDependencies": {
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0",
     "electron-rebuild": "^3.2.9"
   }
 }
