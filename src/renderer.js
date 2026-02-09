@@ -329,7 +329,9 @@ async function addStudent(event) {
 
   if (result.success) {
     hideAddStudentForm();
-    loadAllData();
+    // Optimized: Only reload what's necessary instead of everything
+    await Promise.all([loadStatistics(), loadStudents()]);
+    updateDashboard();
   } else {
     alert("Error: " + result.error);
   }
@@ -340,7 +342,9 @@ async function deleteStudent(studentId) {
     const result = await ipcRenderer.invoke("delete-student", studentId);
     if (result.success) {
       alert("Student deleted successfully!");
-      loadAllData();
+      // Optimized: Only reload what's necessary
+      await Promise.all([loadStatistics(), loadStudents()]);
+      updateDashboard();
     } else {
       alert("Error: " + result.error);
     }
@@ -482,7 +486,9 @@ async function addBook(event) {
 
   if (result.success) {
     hideAddBookForm();
-    loadAllData();
+    // Optimized: Only reload what's necessary instead of everything
+    await Promise.all([loadStatistics(), loadBooks()]);
+    updateDashboard();
   } else {
     alert("Error: " + result.error);
   }
@@ -493,7 +499,9 @@ async function deleteBook(isbn) {
     const result = await ipcRenderer.invoke("delete-book", isbn);
     if (result.success) {
       alert("Book deleted successfully!");
-      loadAllData();
+      // Optimized: Only reload what's necessary
+      await Promise.all([loadStatistics(), loadBooks()]);
+      updateDashboard();
     } else {
       alert("Error: " + result.error);
     }
@@ -527,7 +535,9 @@ async function issueBook(event) {
   if (result.success) {
     alert("Book issued successfully!");
     hideIssueBookModal();
-    loadAllData();
+    // Optimized: Only reload what's necessary
+    await Promise.all([loadStatistics(), loadBooks(), loadTransactions()]);
+    updateDashboard();
   } else {
     alert("Error: " + result.error);
   }
@@ -596,7 +606,9 @@ async function returnBook(transactionId) {
     const result = await ipcRenderer.invoke("return-book", transactionId);
     if (result.success) {
       alert("Book returned successfully!");
-      loadAllData();
+      // Optimized: Only reload what's necessary
+      await Promise.all([loadStatistics(), loadBooks(), loadTransactions()]);
+      updateDashboard();
     } else {
       alert("Error: " + result.error);
     }
