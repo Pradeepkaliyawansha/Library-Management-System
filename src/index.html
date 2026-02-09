@@ -4,61 +4,212 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Library Management System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="grain-overlay"></div>
+
     <div class="container">
-      <!-- Header -->
+      <!-- Enhanced Header -->
       <header class="header">
-        <div class="header-title">
-          <img src="/src/images/logo.png" alt="Library Logo" class="logo" />
-          <h1>Library Management System - Aquaculture Unit</h1>
-        </div>
-        <div class="header-stats" id="headerStats">
-          <div class="stat-card">
-            <div class="stat-value" id="totalStudents">0</div>
-            <div class="stat-label">Total Students</div>
+        <div class="header-content">
+          <div class="header-top">
+            <div class="header-left">
+              <div class="logo-container">
+                <div class="logo-icon">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      d="M8 7h8M8 11h6"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </div>
+                <div class="logo-text">
+                  <h1>Library<br />Management</h1>
+                  <p class="subtitle">Aquaculture Unit</p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              class="theme-toggle"
+              onclick="toggleTheme()"
+              aria-label="Toggle theme"
+            >
+              <span class="theme-icon sun-icon">☀️</span>
+              <span class="theme-icon moon-icon">🌙</span>
+            </button>
           </div>
-          <div class="stat-card">
-            <div class="stat-value" id="totalBooks">0</div>
-            <div class="stat-label">Total Books</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="availableCopies">0</div>
-            <div class="stat-label">Available Copies</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="issuedBooks">0</div>
-            <div class="stat-label">Issued Books</div>
+
+          <div class="header-stats-grid">
+            <div class="stat-card" data-stat="students">
+              <div class="stat-icon">👥</div>
+              <div class="stat-content">
+                <div class="stat-value" id="totalStudents">0</div>
+                <div class="stat-label">Total Students</div>
+              </div>
+              <div class="stat-bg"></div>
+            </div>
+
+            <div class="stat-card" data-stat="books">
+              <div class="stat-icon">📚</div>
+              <div class="stat-content">
+                <div class="stat-value" id="totalBooks">0</div>
+                <div class="stat-label">Total Books</div>
+              </div>
+              <div class="stat-bg"></div>
+            </div>
+
+            <div class="stat-card" data-stat="available">
+              <div class="stat-icon">✓</div>
+              <div class="stat-content">
+                <div class="stat-value" id="availableCopies">0</div>
+                <div class="stat-label">Available</div>
+              </div>
+              <div class="stat-bg"></div>
+            </div>
+
+            <div class="stat-card" data-stat="issued">
+              <div class="stat-icon">📖</div>
+              <div class="stat-content">
+                <div class="stat-value" id="issuedBooks">0</div>
+                <div class="stat-label">Issued</div>
+              </div>
+              <div class="stat-bg"></div>
+            </div>
           </div>
         </div>
       </header>
 
-      <!-- Navigation Tabs -->
-      <div class="tabs">
-        <button class="tab-button active" onclick="showTab('dashboard')">
-          Dashboard
+      <!-- Enhanced Navigation -->
+      <nav class="tabs">
+        <button
+          class="tab-button active"
+          onclick="showTab('dashboard')"
+          data-tab="dashboard"
+        >
+          <span class="tab-icon">🏠</span>
+          <span class="tab-label">Dashboard</span>
         </button>
-        <button class="tab-button" onclick="showTab('students')">
-          Students
+        <button
+          class="tab-button"
+          onclick="showTab('students')"
+          data-tab="students"
+        >
+          <span class="tab-icon">👨‍🎓</span>
+          <span class="tab-label">Students</span>
         </button>
-        <button class="tab-button" onclick="showTab('books')">Books</button>
-        <button class="tab-button" onclick="showTab('transactions')">
-          Transactions
+        <button class="tab-button" onclick="showTab('books')" data-tab="books">
+          <span class="tab-icon">📕</span>
+          <span class="tab-label">Books</span>
         </button>
-      </div>
+        <button
+          class="tab-button"
+          onclick="showTab('transactions')"
+          data-tab="transactions"
+        >
+          <span class="tab-icon">🔄</span>
+          <span class="tab-label">Transactions</span>
+        </button>
+      </nav>
 
-      <!-- Dashboard Tab -->
+      <!-- Enhanced Dashboard Tab -->
       <div id="dashboard" class="tab-content active">
-        <h2>Dashboard Overview</h2>
-        <div class="dashboard-grid">
-          <div class="dashboard-section">
-            <h3>Recent Students</h3>
-            <div id="recentStudents" class="dashboard-list"></div>
+        <div class="dashboard-hero">
+          <h2 class="dashboard-title">Welcome Back</h2>
+          <p class="dashboard-subtitle">
+            Here's what's happening in your library today
+          </p>
+        </div>
+
+        <div class="dashboard-layout">
+          <!-- Quick Actions -->
+          <div class="quick-actions">
+            <h3 class="section-title">Quick Actions</h3>
+            <div class="action-cards">
+              <button
+                class="action-card"
+                onclick="
+                  showTab('students');
+                  showAddStudentForm();
+                "
+              >
+                <div class="action-icon">➕</div>
+                <div class="action-text">
+                  <div class="action-title">Add Student</div>
+                  <div class="action-desc">Register new student</div>
+                </div>
+              </button>
+
+              <button
+                class="action-card"
+                onclick="
+                  showTab('books');
+                  showAddBookForm();
+                "
+              >
+                <div class="action-icon">📚</div>
+                <div class="action-text">
+                  <div class="action-title">Add Book</div>
+                  <div class="action-desc">Add to collection</div>
+                </div>
+              </button>
+
+              <button class="action-card" onclick="showTab('transactions')">
+                <div class="action-icon">👁️</div>
+                <div class="action-text">
+                  <div class="action-title">View Activity</div>
+                  <div class="action-desc">Recent transactions</div>
+                </div>
+              </button>
+            </div>
           </div>
-          <div class="dashboard-section">
-            <h3>Recent Books</h3>
-            <div id="recentBooks" class="dashboard-list"></div>
+
+          <!-- Recent Activity -->
+          <div class="dashboard-sections">
+            <div class="dashboard-section students-section">
+              <div class="section-header-dash">
+                <h3 class="section-title">Recently Added Students</h3>
+                <button class="view-all-btn" onclick="showTab('students')">
+                  View All →
+                </button>
+              </div>
+              <div id="recentStudents" class="dashboard-list"></div>
+            </div>
+
+            <div class="dashboard-section books-section">
+              <div class="section-header-dash">
+                <h3 class="section-title">Recently Added Books</h3>
+                <button class="view-all-btn" onclick="showTab('books')">
+                  View All →
+                </button>
+              </div>
+              <div id="recentBooks" class="dashboard-list"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -66,13 +217,16 @@
       <!-- Students Tab -->
       <div id="students" class="tab-content">
         <div class="section-header">
-          <h2>Student Management</h2>
+          <div class="section-title-group">
+            <h2 class="page-title">Student Management</h2>
+            <p class="page-subtitle">Manage your student database</p>
+          </div>
           <div class="button-group">
             <button class="btn btn-success" onclick="exportStudentsToExcel()">
-              📊 Export to Excel
+              <span>📊</span> Export to Excel
             </button>
             <button class="btn btn-primary" onclick="showAddStudentForm()">
-              + Add Student
+              <span>+</span> Add Student
             </button>
           </div>
         </div>
@@ -135,7 +289,7 @@
             type="text"
             id="studentSearch"
             class="search-input"
-            placeholder="Search students..."
+            placeholder="🔍 Search students..."
             onkeyup="filterStudents()"
           />
           <table id="studentsTable">
@@ -158,13 +312,16 @@
       <!-- Books Tab -->
       <div id="books" class="tab-content">
         <div class="section-header">
-          <h2>Book Management</h2>
+          <div class="section-title-group">
+            <h2 class="page-title">Book Management</h2>
+            <p class="page-subtitle">Manage your library collection</p>
+          </div>
           <div class="button-group">
             <button class="btn btn-success" onclick="exportBooksToExcel()">
-              📊 Export to Excel
+              <span>📊</span> Export to Excel
             </button>
             <button class="btn btn-primary" onclick="showAddBookForm()">
-              + Add Book
+              <span>+</span> Add Book
             </button>
           </div>
         </div>
@@ -216,7 +373,7 @@
             type="text"
             id="bookSearch"
             class="search-input"
-            placeholder="Search books..."
+            placeholder="🔍 Search books..."
             onkeyup="filterBooks()"
           />
           <table id="booksTable">
@@ -240,9 +397,12 @@
       <!-- Transactions Tab -->
       <div id="transactions" class="tab-content">
         <div class="section-header">
-          <h2>Book Transactions</h2>
+          <div class="section-title-group">
+            <h2 class="page-title">Book Transactions</h2>
+            <p class="page-subtitle">Track book issues and returns</p>
+          </div>
           <button class="btn btn-success" onclick="exportTransactionsToExcel()">
-            📊 Export to Excel
+            <span>📊</span> Export to Excel
           </button>
         </div>
 
@@ -252,7 +412,7 @@
             type="text"
             id="transactionSearch"
             class="search-input"
-            placeholder="Search transactions..."
+            placeholder="🔍 Search transactions..."
             onkeyup="filterTransactions()"
           />
           <table id="transactionsTable">
@@ -275,6 +435,7 @@
 
     <!-- Issue Book Modal -->
     <div id="issueBookModal" class="modal" style="display: none">
+      <div class="modal-backdrop" onclick="hideIssueBookModal()"></div>
       <div class="modal-content">
         <h3 id="issueBookTitle">Issue Book</h3>
         <form id="issueBookForm" onsubmit="issueBook(event)">
@@ -303,5 +464,25 @@
     </div>
 
     <script src="renderer.js"></script>
+    <script>
+      // Theme Toggle Functionality
+      function toggleTheme() {
+        const body = document.body;
+        const currentTheme = body.getAttribute("data-theme");
+        const newTheme = currentTheme === "light" ? "dark" : "light";
+
+        body.setAttribute("data-theme", newTheme);
+        localStorage.setItem("theme", newTheme);
+
+        // Add transition class
+        body.style.transition = "background-color 0.3s ease, color 0.3s ease";
+      }
+
+      // Load saved theme on page load
+      document.addEventListener("DOMContentLoaded", () => {
+        const savedTheme = localStorage.getItem("theme") || "dark";
+        document.body.setAttribute("data-theme", savedTheme);
+      });
+    </script>
   </body>
 </html>
