@@ -1249,3 +1249,39 @@ tbody tr.overdue-row:hover {
     color: black;
   }
 }
+/* Responsive Table Action Buttons */
+.table-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap; /* Allows buttons to wrap to next line on small screens */
+  justify-content: flex-start;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  white-space: nowrap; /* Prevents text inside button from wrapping */
+  flex: 1 1 auto; /* Allows buttons to grow and shrink */
+  min-width: fit-content;
+  text-align: center;
+}
+
+/* On mobile devices, make buttons more tap-friendly */
+@media (max-width: 768px) {
+  .table-actions {
+    flex-direction: column; /* Stack buttons vertically on very small screens */
+    width: 100%;
+  }
+
+  .btn-small {
+    width: 100%;
+    padding: 8px; /* Larger hit area for mobile */
+  }
+}
+.table-responsive {
+  width: 100%;
+  overflow-x: auto; /* Adds horizontal scroll only to the table if it's too wide */
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}

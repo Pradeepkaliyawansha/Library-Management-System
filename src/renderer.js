@@ -301,9 +301,11 @@ function displayStudents(students) {
             <td>${student.department || "N/A"}</td>
             <td>${student.year || "N/A"}</td>
             <td>
-                <button class="btn-small btn-info" onclick="viewStudentBooks('${student.student_id}')">Books</button>
-                <button class="btn-small btn-primary" onclick="editStudent('${student.student_id}')">Edit</button>
-                <button class="btn-small btn-danger" onclick="deleteStudent('${student.student_id}')">Delete</button>
+            <div class="table-actions">
+        <button class="btn-small btn-info" onclick="viewStudentBooks('${student.student_id}')">Books</button>
+        <button class="btn-small btn-primary" onclick="editStudent('${student.student_id}')">Edit</button>
+        <button class="btn-small btn-danger" onclick="deleteStudent('${student.student_id}')">Delete</button>
+    </div>
             </td>
         </tr>
     `,
@@ -472,10 +474,12 @@ function displayBooks(books) {
             <td>${book.total_copies}</td>
             <td>${book.available_copies}</td>
             <td>
+            <div class="table-actions">
                 <button class="btn-small btn-success" onclick="showIssueBookModal('${book.isbn}')" ${book.available_copies <= 0 ? "disabled" : ""}>Issue</button>
                 <button class="btn-small btn-primary" onclick="editBook('${book.isbn}')">Edit</button>
                 <button class="btn-small btn-danger" onclick="deleteBook('${book.isbn}')">Delete</button>
-            </td>
+            </div>
+                </td>
         </tr>
     `,
     )
@@ -689,9 +693,11 @@ function displayTransactions(transactions) {
             <td>${dueDate}</td>
             <td>${returnDate}</td>
             <td>
+            <div class="table-actions">
                 <span class="status-badge status-${t.status}">${t.status.toUpperCase()}</span>
                 ${t.status === "issued" ? `<button class="btn-small btn-warning" onclick="returnBook(${t.id})">Return</button>` : ""}
                 ${deleteButton}
+              </div>  
             </td>
         </tr>
       `;
