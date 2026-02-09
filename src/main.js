@@ -541,7 +541,21 @@ ipcMain.handle("delete-book", (event, isbn) => {
 // Transactions - Issue Book
 ipcMain.handle("issue-book", (event, transaction) => {
   try {
-    // Check if book is available
+    // 1. Check if student already has an active issue of THIS specific book
+    const duplicateCheck = db.exec(
+      "SELECT id FROM transactions WHERE student_id = ? AND isbn = ? AND status = 'issued'",
+      [transaction.student_id, transaction.isbn],
+    );
+
+    if (duplicateCheck.length > 0 && duplicateCheck[0].values.length > 0) {
+      return {
+        success: false,
+        error:
+          "This student already has a copy of this book issued and hasn't returned it yet.",
+      };
+    }
+
+    // 2. Check if book is available
     const bookResult = db.exec(
       "SELECT available_copies FROM books WHERE isbn = ?",
       [transaction.isbn],
@@ -557,7 +571,7 @@ ipcMain.handle("issue-book", (event, transaction) => {
       return { success: false, error: "No copies available" };
     }
 
-    // Check if student exists
+    // 3. Check if student exists
     const studentResult = db.exec(
       "SELECT student_id FROM students WHERE student_id = ?",
       [transaction.student_id],
@@ -591,7 +605,6 @@ ipcMain.handle("issue-book", (event, transaction) => {
     return { success: false, error: error.message };
   }
 });
-
 // Transactions - Return Book
 ipcMain.handle("return-book", (event, transactionId) => {
   try {
@@ -625,6 +638,17 @@ ipcMain.handle("return-book", (event, transactionId) => {
       [isbn],
     );
 
+    saveDatabase();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Delete a specific transaction
+ipcMain.handle("delete-transaction", (event, transactionId) => {
+  try {
+    db.run("DELETE FROM transactions WHERE id = ?", [transactionId]);
     saveDatabase();
     return { success: true };
   } catch (error) {

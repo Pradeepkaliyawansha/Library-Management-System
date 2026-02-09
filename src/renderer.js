@@ -29,45 +29,98 @@ function setupUpdateListeners() {
 
   // Listen for update progress
   ipcRenderer.on("update-downloading", () => {
-    showUpdateNotification("Downloading update...");
+    showNotification("Downloading update...", "info");
   });
 
   ipcRenderer.on("update-progress", (event, progressObj) => {
     const percent = Math.round(progressObj.percent);
-    showUpdateNotification(`Downloading update: ${percent}%`);
+    showNotification(`Downloading update: ${percent}%`, "info");
   });
 }
 
-function showUpdateNotification(message) {
-  // Create a simple notification div
-  const existingNotif = document.getElementById("updateNotification");
+// Enhanced non-blocking notification system
+function showNotification(message, type = "success") {
+  const existingNotif = document.getElementById("customNotification");
   if (existingNotif) {
     existingNotif.remove();
   }
 
   const notification = document.createElement("div");
-  notification.id = "updateNotification";
+  notification.id = "customNotification";
+
+  const colors = {
+    success: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+    error: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+    info: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    warning: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+  };
+
+  const icons = {
+    success: "✓",
+    error: "✕",
+    info: "ℹ",
+    warning: "⚠",
+  };
+
   notification.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: ${colors[type]};
     color: white;
-    padding: 15px 25px;
-    border-radius: 10px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-    z-index: 10000;
+    padding: 15px 25px 15px 20px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 10001;
     font-weight: 600;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideInRight 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards;
+    max-width: 400px;
   `;
-  notification.textContent = message;
+
+  notification.innerHTML = `
+    <span style="font-size: 1.5rem;">${icons[type]}</span>
+    <span>${message}</span>
+  `;
+
   document.body.appendChild(notification);
 
-  // Auto-remove after 5 seconds if it's not a progress update
-  if (!message.includes("%")) {
-    setTimeout(() => {
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    if (notification && notification.parentNode) {
       notification.remove();
-    }, 5000);
-  }
+    }
+  }, 3000);
+}
+
+// Add CSS animations
+if (!document.getElementById("notificationStyles")) {
+  const style = document.createElement("style");
+  style.id = "notificationStyles";
+  style.textContent = `
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 async function loadAllData() {
@@ -141,7 +194,7 @@ function updateDashboard() {
 // Excel Export Functions
 async function exportStudentsToExcel() {
   if (studentsData.length === 0) {
-    alert("No students to export!");
+    showNotification("No students to export!", "warning");
     return;
   }
 
@@ -159,15 +212,15 @@ async function exportStudentsToExcel() {
   });
 
   if (result.success) {
-    alert(`Students exported successfully to:\n${result.filePath}`);
+    showNotification("Students exported successfully!", "success");
   } else if (result.error !== "Export cancelled") {
-    alert(`Error exporting: ${result.error}`);
+    showNotification(`Export failed: ${result.error}`, "error");
   }
 }
 
 async function exportBooksToExcel() {
   if (booksData.length === 0) {
-    alert("No books to export!");
+    showNotification("No books to export!", "warning");
     return;
   }
 
@@ -186,15 +239,15 @@ async function exportBooksToExcel() {
   });
 
   if (result.success) {
-    alert(`Books exported successfully to:\n${result.filePath}`);
+    showNotification("Books exported successfully!", "success");
   } else if (result.error !== "Export cancelled") {
-    alert(`Error exporting: ${result.error}`);
+    showNotification(`Export failed: ${result.error}`, "error");
   }
 }
 
 async function exportTransactionsToExcel() {
   if (transactionsData.length === 0) {
-    alert("No transactions to export!");
+    showNotification("No transactions to export!", "warning");
     return;
   }
 
@@ -216,9 +269,9 @@ async function exportTransactionsToExcel() {
   });
 
   if (result.success) {
-    alert(`Transactions exported successfully to:\n${result.filePath}`);
+    showNotification("Transactions exported successfully!", "success");
   } else if (result.error !== "Export cancelled") {
-    alert(`Error exporting: ${result.error}`);
+    showNotification(`Export failed: ${result.error}`, "error");
   }
 }
 
@@ -314,39 +367,58 @@ async function addStudent(event) {
     year: document.getElementById("studentYear").value,
   };
 
+  // Immediately hide form and show notification - non-blocking
+  const isEdit = !!editingStudent;
+  hideAddStudentForm();
+  showNotification(
+    isEdit ? "Updating student..." : "Adding student...",
+    "info",
+  );
+
+  // Perform database operation
   let result;
-  if (editingStudent) {
+  if (isEdit) {
     result = await ipcRenderer.invoke("update-student", student);
-    if (result.success) {
-      alert("Student updated successfully!");
-    }
   } else {
     result = await ipcRenderer.invoke("add-student", student);
-    if (result.success) {
-      alert("Student added successfully!");
-    }
   }
 
   if (result.success) {
-    hideAddStudentForm();
-    // Optimized: Only reload what's necessary instead of everything
-    await Promise.all([loadStatistics(), loadStudents()]);
-    updateDashboard();
+    showNotification(
+      isEdit ? "Student updated successfully!" : "Student added successfully!",
+      "success",
+    );
+
+    // Reload data in background - non-blocking
+    Promise.all([loadStatistics(), loadStudents()]).then(() => {
+      updateDashboard();
+    });
   } else {
-    alert("Error: " + result.error);
+    showNotification(`Error: ${result.error}`, "error");
+    // Reopen form on error
+    if (isEdit) {
+      editStudent(student.student_id);
+    } else {
+      showAddStudentForm();
+    }
   }
 }
 
 async function deleteStudent(studentId) {
   if (confirm("Are you sure you want to delete this student?")) {
+    showNotification("Deleting student...", "info");
+
     const result = await ipcRenderer.invoke("delete-student", studentId);
+
     if (result.success) {
-      alert("Student deleted successfully!");
-      // Optimized: Only reload what's necessary
-      await Promise.all([loadStatistics(), loadStudents()]);
-      updateDashboard();
+      showNotification("Student deleted successfully!", "success");
+
+      // Reload data in background
+      Promise.all([loadStatistics(), loadStudents()]).then(() => {
+        updateDashboard();
+      });
     } else {
-      alert("Error: " + result.error);
+      showNotification(`Error: ${result.error}`, "error");
     }
   }
 }
@@ -471,39 +543,55 @@ async function addBook(event) {
       : totalCopies,
   };
 
+  // Immediately hide form and show notification - non-blocking
+  const isEdit = !!editingBook;
+  hideAddBookForm();
+  showNotification(isEdit ? "Updating book..." : "Adding book...", "info");
+
+  // Perform database operation
   let result;
-  if (editingBook) {
+  if (isEdit) {
     result = await ipcRenderer.invoke("update-book", book);
-    if (result.success) {
-      alert("Book updated successfully!");
-    }
   } else {
     result = await ipcRenderer.invoke("add-book", book);
-    if (result.success) {
-      alert("Book added successfully!");
-    }
   }
 
   if (result.success) {
-    hideAddBookForm();
-    // Optimized: Only reload what's necessary instead of everything
-    await Promise.all([loadStatistics(), loadBooks()]);
-    updateDashboard();
+    showNotification(
+      isEdit ? "Book updated successfully!" : "Book added successfully!",
+      "success",
+    );
+
+    // Reload data in background - non-blocking
+    Promise.all([loadStatistics(), loadBooks()]).then(() => {
+      updateDashboard();
+    });
   } else {
-    alert("Error: " + result.error);
+    showNotification(`Error: ${result.error}`, "error");
+    // Reopen form on error
+    if (isEdit) {
+      editBook(book.isbn);
+    } else {
+      showAddBookForm();
+    }
   }
 }
 
 async function deleteBook(isbn) {
   if (confirm("Are you sure you want to delete this book?")) {
+    showNotification("Deleting book...", "info");
+
     const result = await ipcRenderer.invoke("delete-book", isbn);
+
     if (result.success) {
-      alert("Book deleted successfully!");
-      // Optimized: Only reload what's necessary
-      await Promise.all([loadStatistics(), loadBooks()]);
-      updateDashboard();
+      showNotification("Book deleted successfully!", "success");
+
+      // Reload data in background
+      Promise.all([loadStatistics(), loadBooks()]).then(() => {
+        updateDashboard();
+      });
     } else {
-      alert("Error: " + result.error);
+      showNotification(`Error: ${result.error}`, "error");
     }
   }
 }
@@ -530,16 +618,23 @@ async function issueBook(event) {
     isbn: document.getElementById("issueBookIsbn").value,
   };
 
+  // Immediately hide modal and show notification - non-blocking
+  hideIssueBookModal();
+  showNotification("Issuing book...", "info");
+
   const result = await ipcRenderer.invoke("issue-book", transaction);
 
   if (result.success) {
-    alert("Book issued successfully!");
-    hideIssueBookModal();
-    // Optimized: Only reload what's necessary
-    await Promise.all([loadStatistics(), loadBooks(), loadTransactions()]);
-    updateDashboard();
+    showNotification("Book issued successfully!", "success");
+
+    // Reload data in background - non-blocking
+    Promise.all([loadStatistics(), loadBooks(), loadTransactions()]).then(
+      () => {
+        updateDashboard();
+      },
+    );
   } else {
-    alert("Error: " + result.error);
+    showNotification(`Error: ${result.error}`, "error");
   }
 }
 
@@ -570,6 +665,21 @@ function displayTransactions(transactions) {
       const isOverdue =
         t.status === "issued" && new Date(t.due_date) < new Date();
 
+      // --- Logic for Delete Button Visibility ---
+      let deleteButton = "";
+      if (t.status === "returned" && t.return_date) {
+        const returnDateObj = new Date(t.return_date);
+        const today = new Date();
+
+        // Calculate difference in milliseconds and convert to days
+        const diffTime = Math.abs(today - returnDateObj);
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays >= 7) {
+          deleteButton = `<button class="btn-small btn-danger" onclick="deleteTransaction(${t.id})" style="margin-left: 5px;">Delete Record</button>`;
+        }
+      }
+
       return `
         <tr class="${isOverdue ? "overdue-row" : ""}">
             <td>${t.student_id}</td>
@@ -581,6 +691,7 @@ function displayTransactions(transactions) {
             <td>
                 <span class="status-badge status-${t.status}">${t.status.toUpperCase()}</span>
                 ${t.status === "issued" ? `<button class="btn-small btn-warning" onclick="returnBook(${t.id})">Return</button>` : ""}
+                ${deleteButton}
             </td>
         </tr>
       `;
@@ -603,14 +714,21 @@ function filterTransactions() {
 
 async function returnBook(transactionId) {
   if (confirm("Mark this book as returned?")) {
+    showNotification("Processing return...", "info");
+
     const result = await ipcRenderer.invoke("return-book", transactionId);
+
     if (result.success) {
-      alert("Book returned successfully!");
-      // Optimized: Only reload what's necessary
-      await Promise.all([loadStatistics(), loadBooks(), loadTransactions()]);
-      updateDashboard();
+      showNotification("Book returned successfully!", "success");
+
+      // Reload data in background - non-blocking
+      Promise.all([loadStatistics(), loadBooks(), loadTransactions()]).then(
+        () => {
+          updateDashboard();
+        },
+      );
     } else {
-      alert("Error: " + result.error);
+      showNotification(`Error: ${result.error}`, "error");
     }
   }
 }
