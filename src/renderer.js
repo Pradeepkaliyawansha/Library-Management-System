@@ -360,6 +360,12 @@ function editStudent(studentId) {
   document.getElementById("studentDepartment").value = student.department || "";
   document.getElementById("studentYear").value = student.year || "";
   document.getElementById("addStudentForm").style.display = "block";
+
+  const formContainer = document.getElementById("addStudentForm");
+  formContainer.style.display = "block";
+
+  // ADD THIS LINE:
+  formContainer.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 async function addStudent(event) {
@@ -531,6 +537,12 @@ function editBook(isbn) {
   document.getElementById("bookCategory").value = book.category || "";
   document.getElementById("bookTotalCopies").value = book.total_copies;
   document.getElementById("addBookForm").style.display = "block";
+
+  const formContainer = document.getElementById("addBookForm");
+  formContainer.style.display = "block";
+
+  // ADD THIS LINE:
+  formContainer.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 async function addBook(event) {
