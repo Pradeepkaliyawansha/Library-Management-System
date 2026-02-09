@@ -435,11 +435,25 @@ body[data-theme="light"] .stat-card:hover::before {
 .tab-button.active {
   background: linear-gradient(
     135deg,
-    var(--color-primary) 0%,
-    var(--color-primary-dark) 100%
+    rgba(99, 102, 241, 0.15) 0%,
+    rgba(79, 70, 229, 0.2) 100%
   );
-  color: white;
-  box-shadow: var(--shadow-md), var(--shadow-glow);
+  color: var(--color-text);
+  border: 2px solid var(--color-primary);
+  box-shadow:
+    var(--shadow-md),
+    0 0 15px rgba(99, 102, 241, 0.2);
+}
+
+/* Light theme specific styling */
+body[data-theme="light"] .tab-button.active {
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.12) 0%,
+    rgba(79, 70, 229, 0.18) 100%
+  );
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
 }
 
 .tab-icon {

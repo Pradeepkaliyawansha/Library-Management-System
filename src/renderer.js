@@ -141,7 +141,7 @@ async function loadStatistics() {
   document.getElementById("issuedBooks").textContent = stats.issuedBooks;
 }
 
-// Tab Management
+// Tab Management - FIXED
 function showTab(tabName) {
   const tabs = document.querySelectorAll(".tab-content");
   const buttons = document.querySelectorAll(".tab-button");
@@ -150,7 +150,12 @@ function showTab(tabName) {
   buttons.forEach((btn) => btn.classList.remove("active"));
 
   document.getElementById(tabName).classList.add("active");
-  event.target.classList.add("active");
+
+  // Find and activate the correct button using data-tab attribute
+  const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
+  if (activeButton) {
+    activeButton.classList.add("active");
+  }
 }
 
 // Dashboard
@@ -733,6 +738,26 @@ async function returnBook(transactionId) {
           updateDashboard();
         },
       );
+    } else {
+      showNotification(`Error: ${result.error}`, "error");
+    }
+  }
+}
+
+async function deleteTransaction(transactionId) {
+  if (confirm("Are you sure you want to delete this transaction record?")) {
+    showNotification("Deleting transaction...", "info");
+
+    const result = await ipcRenderer.invoke(
+      "delete-transaction",
+      transactionId,
+    );
+
+    if (result.success) {
+      showNotification("Transaction deleted successfully!", "success");
+
+      // Reload data in background
+      loadTransactions();
     } else {
       showNotification(`Error: ${result.error}`, "error");
     }
