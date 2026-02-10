@@ -688,17 +688,8 @@ function displayTransactions(transactions) {
 
       // --- Logic for Delete Button Visibility ---
       let deleteButton = "";
-      if (t.status === "returned" && t.return_date) {
-        const returnDateObj = new Date(t.return_date);
-        const today = new Date();
-
-        // Calculate difference in milliseconds and convert to days
-        const diffTime = Math.abs(today - returnDateObj);
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays >= 7) {
-          deleteButton = `<button class="btn-small btn-danger" onclick="deleteTransaction(${t.id})" style="margin-left: 5px;">Delete Record</button>`;
-        }
+      if (t.status === "returned") {
+        deleteButton = `<button class="btn-small btn-danger" onclick="deleteTransaction(${t.id})">Delete</button>`;
       }
 
       return `
@@ -735,8 +726,10 @@ function filterTransactions() {
   displayTransactions(filtered);
 }
 
+// OPTIMIZED RETURN BOOK FUNCTION - MUCH FASTER!
 async function returnBook(transactionId) {
   if (confirm("Mark this book as returned?")) {
+    // Immediately show notification - non-blocking
     showNotification("Processing return...", "info");
 
     const result = await ipcRenderer.invoke("return-book", transactionId);
@@ -744,12 +737,17 @@ async function returnBook(transactionId) {
     if (result.success) {
       showNotification("Book returned successfully!", "success");
 
-      // Reload data in background - non-blocking
-      Promise.all([loadStatistics(), loadBooks(), loadTransactions()]).then(
-        () => {
+      // Reload only transactions immediately for instant feedback
+      // This makes the UI responsive right away!
+      loadTransactions();
+
+      // Reload other data in background without blocking the UI
+      // Using setTimeout ensures UI updates happen first
+      setTimeout(() => {
+        Promise.all([loadStatistics(), loadBooks()]).then(() => {
           updateDashboard();
-        },
-      );
+        });
+      }, 100);
     } else {
       showNotification(`Error: ${result.error}`, "error");
     }
