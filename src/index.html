@@ -332,7 +332,12 @@
           <h3 id="bookFormTitle">Add New Book</h3>
           <form onsubmit="addBook(event)">
             <div class="form-grid">
-              <input type="text" id="bookIsbn" placeholder="ISBN *" required />
+              <input
+                type="text"
+                id="bookIsbn"
+                placeholder="Book No. *"
+                required
+              />
               <input
                 type="text"
                 id="bookTitle"
@@ -380,7 +385,7 @@
           <table id="booksTable">
             <thead>
               <tr>
-                <th>ISBN</th>
+                <th>Book No.</th>
                 <th>Title</th>
                 <th>Author</th>
                 <th>Publisher</th>

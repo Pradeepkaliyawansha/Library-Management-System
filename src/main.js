@@ -14,12 +14,11 @@ const { autoUpdater } = require("electron-updater");
 let mainWindow;
 let db;
 let SQL;
+let saveTimeout = null;
 
-// Configure auto-updater
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 
-// Initialize database
 async function initDatabase() {
   try {
     SQL = await initSqlJs({
@@ -29,7 +28,6 @@ async function initDatabase() {
 
     const dbPath = path.join(app.getPath("userData"), "library.db");
 
-    // Load existing database or create new one
     if (fs.existsSync(dbPath)) {
       const buffer = fs.readFileSync(dbPath);
       db = new SQL.Database(buffer);
@@ -37,7 +35,6 @@ async function initDatabase() {
       db = new SQL.Database();
     }
 
-    // Create tables
     db.run(`
       CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,15 +76,11 @@ async function initDatabase() {
       );
     `);
 
-    // Check if due_date column exists, if not add it (for database migration)
     try {
       const checkColumn = db.exec("PRAGMA table_info(transactions)");
       if (checkColumn.length > 0) {
-        const columns = checkColumn[0].values.map((row) => row[1]); // Get column names
+        const columns = checkColumn[0].values.map((row) => row[1]);
         if (!columns.includes("due_date")) {
-          console.log(
-            "Adding missing due_date column to transactions table...",
-          );
           db.run("ALTER TABLE transactions ADD COLUMN due_date TEXT");
         }
       }
@@ -95,9 +88,7 @@ async function initDatabase() {
       console.log("Column check/migration:", error.message);
     }
 
-    // Save database
-    saveDatabase();
-    console.log("Database initialized successfully");
+    await saveDatabase();
   } catch (error) {
     console.error("Database initialization error:", error);
   }
@@ -109,15 +100,22 @@ async function saveDatabase() {
     const data = db.export();
     const buffer = Buffer.from(data);
 
-    // Use the promise-based writeFile to prevent UI blocking
     await fs.promises.writeFile(dbPath, buffer);
-    console.log("Database saved in background.");
   } catch (error) {
     console.error("Error saving database:", error);
   }
 }
 
-// Create application menu
+function debouncedSave() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+
+  saveTimeout = setTimeout(async () => {
+    await saveDatabase();
+  }, 300);
+}
+
 function createMenu() {
   const template = [
     {
@@ -159,7 +157,7 @@ function createMenu() {
             if (!result.canceled && result.filePath) {
               try {
                 const dbPath = path.join(app.getPath("userData"), "library.db");
-                fs.copyFileSync(dbPath, result.filePath);
+                await fs.promises.copyFile(dbPath, result.filePath);
                 dialog.showMessageBox(mainWindow, {
                   type: "info",
                   title: "Backup Successful",
@@ -198,7 +196,7 @@ function createMenu() {
                     app.getPath("userData"),
                     "library.db",
                   );
-                  fs.copyFileSync(result.filePaths[0], dbPath);
+                  await fs.promises.copyFile(result.filePaths[0], dbPath);
                   dialog.showMessageBox(mainWindow, {
                     type: "info",
                     title: "Restore Successful",
@@ -280,7 +278,6 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-// Auto-updater event handlers
 autoUpdater.on("checking-for-update", () => {
   console.log("Checking for updates...");
 });
@@ -298,8 +295,6 @@ autoUpdater.on("update-available", (info) => {
     .then((result) => {
       if (result.response === 0) {
         autoUpdater.downloadUpdate();
-
-        // Show download progress
         mainWindow.webContents.send("update-downloading");
       }
     });
@@ -368,29 +363,14 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, "index.html"));
-
-  // Create menu
   createMenu();
-
-  // Check for updates on startup (optional - can be removed if you don't want auto-check)
-  // setTimeout(() => {
-  //   autoUpdater.checkForUpdates();
-  // }, 3000);
-
-  // Uncomment for development
-  // mainWindow.webContents.openDevTools();
 }
 
-// IPC Handlers for Database Operations
-
-// Students
-ipcMain.handle("add-student", (event, student) => {
+ipcMain.handle("add-student", async (event, student) => {
   try {
     db.run(
-      `
-      INSERT INTO students (student_id, name, email, phone, department, year)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `,
+      `INSERT INTO students (student_id, name, email, phone, department, year)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         student.student_id,
         student.name,
@@ -400,7 +380,7 @@ ipcMain.handle("add-student", (event, student) => {
         student.year,
       ],
     );
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -428,13 +408,11 @@ ipcMain.handle("get-students", () => {
   }
 });
 
-ipcMain.handle("update-student", (event, student) => {
+ipcMain.handle("update-student", async (event, student) => {
   try {
     db.run(
-      `
-      UPDATE students SET name = ?, email = ?, phone = ?, department = ?, year = ?
-      WHERE student_id = ?
-    `,
+      `UPDATE students SET name = ?, email = ?, phone = ?, department = ?, year = ?
+       WHERE student_id = ?`,
       [
         student.name,
         student.email,
@@ -444,31 +422,28 @@ ipcMain.handle("update-student", (event, student) => {
         student.student_id,
       ],
     );
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle("delete-student", (event, studentId) => {
+ipcMain.handle("delete-student", async (event, studentId) => {
   try {
     db.run("DELETE FROM students WHERE student_id = ?", [studentId]);
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// Books
-ipcMain.handle("add-book", (event, book) => {
+ipcMain.handle("add-book", async (event, book) => {
   try {
     db.run(
-      `
-      INSERT INTO books (isbn, title, author, publisher, category, total_copies, available_copies)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `,
+      `INSERT INTO books (isbn, title, author, publisher, category, total_copies, available_copies)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         book.isbn,
         book.title,
@@ -479,7 +454,7 @@ ipcMain.handle("add-book", (event, book) => {
         book.available_copies,
       ],
     );
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -507,13 +482,11 @@ ipcMain.handle("get-books", () => {
   }
 });
 
-ipcMain.handle("update-book", (event, book) => {
+ipcMain.handle("update-book", async (event, book) => {
   try {
     db.run(
-      `
-      UPDATE books SET title = ?, author = ?, publisher = ?, category = ?, total_copies = ?, available_copies = ?
-      WHERE isbn = ?
-    `,
+      `UPDATE books SET title = ?, author = ?, publisher = ?, category = ?, total_copies = ?, available_copies = ?
+       WHERE isbn = ?`,
       [
         book.title,
         book.author,
@@ -524,27 +497,25 @@ ipcMain.handle("update-book", (event, book) => {
         book.isbn,
       ],
     );
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle("delete-book", (event, isbn) => {
+ipcMain.handle("delete-book", async (event, isbn) => {
   try {
     db.run("DELETE FROM books WHERE isbn = ?", [isbn]);
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// Transactions - Issue Book
-ipcMain.handle("issue-book", (event, transaction) => {
+ipcMain.handle("issue-book", async (event, transaction) => {
   try {
-    // 1. Check if student already has an active issue of THIS specific book
     const duplicateCheck = db.exec(
       "SELECT id FROM transactions WHERE student_id = ? AND isbn = ? AND status = 'issued'",
       [transaction.student_id, transaction.isbn],
@@ -558,7 +529,6 @@ ipcMain.handle("issue-book", (event, transaction) => {
       };
     }
 
-    // 2. Check if book is available
     const bookResult = db.exec(
       "SELECT available_copies FROM books WHERE isbn = ?",
       [transaction.isbn],
@@ -574,7 +544,6 @@ ipcMain.handle("issue-book", (event, transaction) => {
       return { success: false, error: "No copies available" };
     }
 
-    // 3. Check if student exists
     const studentResult = db.exec(
       "SELECT student_id FROM students WHERE student_id = ?",
       [transaction.student_id],
@@ -584,34 +553,30 @@ ipcMain.handle("issue-book", (event, transaction) => {
       return { success: false, error: "Student not found" };
     }
 
-    // Calculate due date (14 days from now)
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 14);
     const dueDateStr = dueDate.toISOString();
 
-    // Insert transaction
     db.run(
       `INSERT INTO transactions (student_id, isbn, due_date, status)
        VALUES (?, ?, ?, 'issued')`,
       [transaction.student_id, transaction.isbn, dueDateStr],
     );
 
-    // Update available copies
     db.run(
       "UPDATE books SET available_copies = available_copies - 1 WHERE isbn = ?",
       [transaction.isbn],
     );
 
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
-// Transactions - Return Book
-ipcMain.handle("return-book", (event, transactionId) => {
+
+ipcMain.handle("return-book", async (event, transactionId) => {
   try {
-    // Get transaction details
     const transResult = db.exec(
       "SELECT isbn, status FROM transactions WHERE id = ?",
       [transactionId],
@@ -628,38 +593,34 @@ ipcMain.handle("return-book", (event, transactionId) => {
       return { success: false, error: "Book already returned" };
     }
 
-    // Update transaction
     db.run(
       `UPDATE transactions SET status = 'returned', return_date = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [transactionId],
     );
 
-    // Update available copies
     db.run(
       "UPDATE books SET available_copies = available_copies + 1 WHERE isbn = ?",
       [isbn],
     );
 
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// Delete a specific transaction
-ipcMain.handle("delete-transaction", (event, transactionId) => {
+ipcMain.handle("delete-transaction", async (event, transactionId) => {
   try {
     db.run("DELETE FROM transactions WHERE id = ?", [transactionId]);
-    saveDatabase();
+    debouncedSave();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// Get all transactions
 ipcMain.handle("get-transactions", () => {
   try {
     const result = db.exec(`
@@ -697,12 +658,10 @@ ipcMain.handle("get-transactions", () => {
   }
 });
 
-// Get student's borrowed books
 ipcMain.handle("get-student-books", (event, studentId) => {
   try {
     const result = db.exec(
-      `
-      SELECT 
+      `SELECT 
         t.id,
         t.isbn,
         b.title,
@@ -713,8 +672,7 @@ ipcMain.handle("get-student-books", (event, studentId) => {
       FROM transactions t
       LEFT JOIN books b ON t.isbn = b.isbn
       WHERE t.student_id = ? AND t.status = 'issued'
-      ORDER BY t.issue_date DESC
-    `,
+      ORDER BY t.issue_date DESC`,
       [studentId],
     );
 
@@ -736,7 +694,6 @@ ipcMain.handle("get-student-books", (event, studentId) => {
   }
 });
 
-// Statistics
 ipcMain.handle("get-statistics", () => {
   try {
     let totalStudents = 0;
@@ -781,20 +738,17 @@ ipcMain.handle("get-statistics", () => {
   }
 });
 
-// Excel Export Handler
 ipcMain.handle("export-to-excel", async (event, { type, data }) => {
   try {
     const ExcelJS = require("exceljs");
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(type);
 
-    // Set worksheet properties
     worksheet.properties.defaultRowHeight = 20;
 
     let columns = [];
     let title = "";
 
-    // Configure columns based on type
     if (type === "Students") {
       title = "Students Report";
       columns = [
@@ -833,7 +787,6 @@ ipcMain.handle("export-to-excel", async (event, { type, data }) => {
       ];
     }
 
-    // Add title row
     worksheet.mergeCells("A1", String.fromCharCode(64 + columns.length) + "1");
     const titleCell = worksheet.getCell("A1");
     titleCell.value = title;
@@ -846,17 +799,14 @@ ipcMain.handle("export-to-excel", async (event, { type, data }) => {
     titleCell.alignment = { vertical: "middle", horizontal: "center" };
     worksheet.getRow(1).height = 30;
 
-    // Add export date
     worksheet.mergeCells("A2", String.fromCharCode(64 + columns.length) + "2");
     const dateCell = worksheet.getCell("A2");
     dateCell.value = `Generated on: ${new Date().toLocaleString()}`;
     dateCell.font = { size: 10, italic: true };
     dateCell.alignment = { horizontal: "center" };
 
-    // Set columns (starting from row 3)
     worksheet.columns = columns;
 
-    // Style header row
     const headerRow = worksheet.getRow(3);
     columns.forEach((col, index) => {
       const cell = headerRow.getCell(index + 1);
@@ -877,7 +827,6 @@ ipcMain.handle("export-to-excel", async (event, { type, data }) => {
     });
     headerRow.height = 25;
 
-    // Add data rows
     data.forEach((item, index) => {
       const row = worksheet.addRow(item);
       row.eachCell((cell) => {
@@ -890,7 +839,6 @@ ipcMain.handle("export-to-excel", async (event, { type, data }) => {
         cell.alignment = { vertical: "middle" };
       });
 
-      // Alternate row coloring
       if (index % 2 === 0) {
         row.eachCell((cell) => {
           cell.fill = {
@@ -902,7 +850,6 @@ ipcMain.handle("export-to-excel", async (event, { type, data }) => {
       }
     });
 
-    // Add summary row for certain types
     if (type === "Books" || type === "Transactions") {
       worksheet.addRow([]);
       const summaryRow = worksheet.addRow(["Total Records:", data.length]);
@@ -919,7 +866,6 @@ ipcMain.handle("export-to-excel", async (event, { type, data }) => {
       };
     }
 
-    // Show save dialog
     const result = await dialog.showSaveDialog(mainWindow, {
       title: `Export ${type} to Excel`,
       defaultPath: `library_${type.toLowerCase()}_${new Date().toISOString().split("T")[0]}.xlsx`,
@@ -955,8 +901,9 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", () => {
-  if (db) {
-    saveDatabase();
+app.on("before-quit", async () => {
+  if (db && saveTimeout) {
+    clearTimeout(saveTimeout);
+    await saveDatabase();
   }
 });
