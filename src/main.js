@@ -103,12 +103,15 @@ async function initDatabase() {
   }
 }
 
-function saveDatabase() {
+async function saveDatabase() {
   try {
     const dbPath = path.join(app.getPath("userData"), "library.db");
     const data = db.export();
     const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
+
+    // Use the promise-based writeFile to prevent UI blocking
+    await fs.promises.writeFile(dbPath, buffer);
+    console.log("Database saved in background.");
   } catch (error) {
     console.error("Error saving database:", error);
   }
