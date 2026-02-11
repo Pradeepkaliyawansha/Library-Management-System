@@ -16,6 +16,22 @@ let db;
 let SQL;
 let saveTimeout = null;
 
+// Cache for frequently accessed data
+let dataCache = {
+  students: null,
+  books: null,
+  transactions: null,
+  statistics: null,
+  lastUpdate: {
+    students: 0,
+    books: 0,
+    transactions: 0,
+    statistics: 0,
+  },
+};
+
+const CACHE_DURATION = 500; // milliseconds
+
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 
@@ -35,6 +51,7 @@ async function initDatabase() {
       db = new SQL.Database();
     }
 
+    // Create tables with indexes for better performance
     db.run(`
       CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,6 +93,23 @@ async function initDatabase() {
       );
     `);
 
+    // Add indexes for better query performance
+    try {
+      db.run(
+        "CREATE INDEX IF NOT EXISTS idx_student_id ON students(student_id)",
+      );
+      db.run("CREATE INDEX IF NOT EXISTS idx_book_isbn ON books(isbn)");
+      db.run(
+        "CREATE INDEX IF NOT EXISTS idx_trans_student ON transactions(student_id)",
+      );
+      db.run("CREATE INDEX IF NOT EXISTS idx_trans_isbn ON transactions(isbn)");
+      db.run(
+        "CREATE INDEX IF NOT EXISTS idx_trans_status ON transactions(status)",
+      );
+    } catch (error) {
+      console.log("Index creation (may already exist):", error.message);
+    }
+
     try {
       const checkColumn = db.exec("PRAGMA table_info(transactions)");
       if (checkColumn.length > 0) {
@@ -114,6 +148,21 @@ function debouncedSave() {
   saveTimeout = setTimeout(async () => {
     await saveDatabase();
   }, 300);
+}
+
+function invalidateCache(tables) {
+  tables.forEach((table) => {
+    dataCache[table] = null;
+    dataCache.lastUpdate[table] = 0;
+  });
+}
+
+function isCacheValid(table) {
+  const now = Date.now();
+  return (
+    dataCache[table] !== null &&
+    now - dataCache.lastUpdate[table] < CACHE_DURATION
+  );
 }
 
 function createMenu() {
@@ -197,6 +246,12 @@ function createMenu() {
                     "library.db",
                   );
                   await fs.promises.copyFile(result.filePaths[0], dbPath);
+                  invalidateCache([
+                    "students",
+                    "books",
+                    "transactions",
+                    "statistics",
+                  ]);
                   dialog.showMessageBox(mainWindow, {
                     type: "info",
                     title: "Restore Successful",
@@ -366,6 +421,7 @@ function createWindow() {
   createMenu();
 }
 
+// Optimized handlers with caching
 ipcMain.handle("add-student", async (event, student) => {
   try {
     db.run(
@@ -380,6 +436,7 @@ ipcMain.handle("add-student", async (event, student) => {
         student.year,
       ],
     );
+    invalidateCache(["students", "statistics"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -389,19 +446,31 @@ ipcMain.handle("add-student", async (event, student) => {
 
 ipcMain.handle("get-students", () => {
   try {
+    if (isCacheValid("students")) {
+      return dataCache.students;
+    }
+
     const result = db.exec("SELECT * FROM students ORDER BY created_at DESC");
-    if (result.length === 0) return [];
+    if (result.length === 0) {
+      dataCache.students = [];
+      dataCache.lastUpdate.students = Date.now();
+      return [];
+    }
 
     const columns = result[0].columns;
     const values = result[0].values;
 
-    return values.map((row) => {
+    const students = values.map((row) => {
       const obj = {};
       columns.forEach((col, idx) => {
         obj[col] = row[idx];
       });
       return obj;
     });
+
+    dataCache.students = students;
+    dataCache.lastUpdate.students = Date.now();
+    return students;
   } catch (error) {
     console.error("Error getting students:", error);
     return [];
@@ -422,6 +491,7 @@ ipcMain.handle("update-student", async (event, student) => {
         student.student_id,
       ],
     );
+    invalidateCache(["students", "statistics"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -432,6 +502,7 @@ ipcMain.handle("update-student", async (event, student) => {
 ipcMain.handle("delete-student", async (event, studentId) => {
   try {
     db.run("DELETE FROM students WHERE student_id = ?", [studentId]);
+    invalidateCache(["students", "statistics"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -454,6 +525,7 @@ ipcMain.handle("add-book", async (event, book) => {
         book.available_copies,
       ],
     );
+    invalidateCache(["books", "statistics"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -463,19 +535,31 @@ ipcMain.handle("add-book", async (event, book) => {
 
 ipcMain.handle("get-books", () => {
   try {
+    if (isCacheValid("books")) {
+      return dataCache.books;
+    }
+
     const result = db.exec("SELECT * FROM books ORDER BY created_at DESC");
-    if (result.length === 0) return [];
+    if (result.length === 0) {
+      dataCache.books = [];
+      dataCache.lastUpdate.books = Date.now();
+      return [];
+    }
 
     const columns = result[0].columns;
     const values = result[0].values;
 
-    return values.map((row) => {
+    const books = values.map((row) => {
       const obj = {};
       columns.forEach((col, idx) => {
         obj[col] = row[idx];
       });
       return obj;
     });
+
+    dataCache.books = books;
+    dataCache.lastUpdate.books = Date.now();
+    return books;
   } catch (error) {
     console.error("Error getting books:", error);
     return [];
@@ -497,6 +581,7 @@ ipcMain.handle("update-book", async (event, book) => {
         book.isbn,
       ],
     );
+    invalidateCache(["books", "statistics"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -507,6 +592,7 @@ ipcMain.handle("update-book", async (event, book) => {
 ipcMain.handle("delete-book", async (event, isbn) => {
   try {
     db.run("DELETE FROM books WHERE isbn = ?", [isbn]);
+    invalidateCache(["books", "statistics"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -568,6 +654,7 @@ ipcMain.handle("issue-book", async (event, transaction) => {
       [transaction.isbn],
     );
 
+    invalidateCache(["transactions", "books", "statistics"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -604,6 +691,7 @@ ipcMain.handle("return-book", async (event, transactionId) => {
       [isbn],
     );
 
+    invalidateCache(["transactions", "books", "statistics"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -614,6 +702,7 @@ ipcMain.handle("return-book", async (event, transactionId) => {
 ipcMain.handle("delete-transaction", async (event, transactionId) => {
   try {
     db.run("DELETE FROM transactions WHERE id = ?", [transactionId]);
+    invalidateCache(["transactions"]);
     debouncedSave();
     return { success: true };
   } catch (error) {
@@ -623,6 +712,10 @@ ipcMain.handle("delete-transaction", async (event, transactionId) => {
 
 ipcMain.handle("get-transactions", () => {
   try {
+    if (isCacheValid("transactions")) {
+      return dataCache.transactions;
+    }
+
     const result = db.exec(`
       SELECT 
         t.id,
@@ -640,18 +733,26 @@ ipcMain.handle("get-transactions", () => {
       ORDER BY t.issue_date DESC
     `);
 
-    if (result.length === 0) return [];
+    if (result.length === 0) {
+      dataCache.transactions = [];
+      dataCache.lastUpdate.transactions = Date.now();
+      return [];
+    }
 
     const columns = result[0].columns;
     const values = result[0].values;
 
-    return values.map((row) => {
+    const transactions = values.map((row) => {
       const obj = {};
       columns.forEach((col, idx) => {
         obj[col] = row[idx];
       });
       return obj;
     });
+
+    dataCache.transactions = transactions;
+    dataCache.lastUpdate.transactions = Date.now();
+    return transactions;
   } catch (error) {
     console.error("Error getting transactions:", error);
     return [];
@@ -696,6 +797,10 @@ ipcMain.handle("get-student-books", (event, studentId) => {
 
 ipcMain.handle("get-statistics", () => {
   try {
+    if (isCacheValid("statistics")) {
+      return dataCache.statistics;
+    }
+
     let totalStudents = 0;
     let totalBooks = 0;
     let totalCopies = 0;
@@ -719,13 +824,17 @@ ipcMain.handle("get-statistics", () => {
       availableCopies = copiesResult[0].values[0][1] || 0;
     }
 
-    return {
+    const stats = {
       totalStudents,
       totalBooks,
       totalCopies,
       availableCopies,
       issuedBooks: totalCopies - availableCopies,
     };
+
+    dataCache.statistics = stats;
+    dataCache.lastUpdate.statistics = Date.now();
+    return stats;
   } catch (error) {
     console.error("Error getting statistics:", error);
     return {

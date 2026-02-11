@@ -5,58 +5,19 @@ let booksData = [];
 let transactionsData = [];
 let editingStudent = null;
 let editingBook = null;
+let operationInProgress = false;
 
-let pendingUpdates = {
-  students: false,
-  books: false,
-  transactions: false,
-  statistics: false,
-  dashboard: false,
+// Debounce timers for search functions
+let searchTimers = {
+  students: null,
+  books: null,
+  transactions: null,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
   loadAllData();
   setupUpdateListeners();
-
-  startSmartRefresh();
 });
-
-function startSmartRefresh() {
-  setInterval(() => {
-    if (pendingUpdates.statistics) {
-      loadStatistics();
-      pendingUpdates.statistics = false;
-    }
-
-    if (pendingUpdates.students) {
-      loadStudents();
-      pendingUpdates.students = false;
-    }
-
-    if (pendingUpdates.books) {
-      loadBooks();
-      pendingUpdates.books = false;
-    }
-
-    if (pendingUpdates.transactions) {
-      loadTransactions();
-      pendingUpdates.transactions = false;
-    }
-
-    if (pendingUpdates.dashboard) {
-      updateDashboard();
-      pendingUpdates.dashboard = false;
-    }
-  }, 200);
-}
-
-function markForUpdate(...items) {
-  items.forEach((item) => {
-    if (pendingUpdates.hasOwnProperty(item)) {
-      pendingUpdates[item] = true;
-    }
-  });
-}
 
 function setupUpdateListeners() {
   ipcRenderer.on("export-students", () => {
@@ -164,11 +125,20 @@ if (!document.getElementById("notificationStyles")) {
 }
 
 async function loadAllData() {
-  await loadStatistics();
-  await loadStudents();
-  await loadBooks();
-  await loadTransactions();
+  const startTime = performance.now();
+
+  // Load in parallel for faster initial load
+  await Promise.all([
+    loadStatistics(),
+    loadStudents(),
+    loadBooks(),
+    loadTransactions(),
+  ]);
+
   updateDashboard();
+
+  const endTime = performance.now();
+  console.log(`Data loaded in ${(endTime - startTime).toFixed(2)}ms`);
 }
 
 async function loadStatistics() {
@@ -351,17 +321,23 @@ function displayStudents(students) {
 }
 
 function filterStudents() {
-  const searchTerm = document
-    .getElementById("studentSearch")
-    .value.toLowerCase();
-  const filtered = studentsData.filter(
-    (s) =>
-      s.student_id.toLowerCase().includes(searchTerm) ||
-      s.name.toLowerCase().includes(searchTerm) ||
-      s.email.toLowerCase().includes(searchTerm) ||
-      (s.department && s.department.toLowerCase().includes(searchTerm)),
-  );
-  displayStudents(filtered);
+  if (searchTimers.students) {
+    clearTimeout(searchTimers.students);
+  }
+
+  searchTimers.students = setTimeout(() => {
+    const searchTerm = document
+      .getElementById("studentSearch")
+      .value.toLowerCase();
+    const filtered = studentsData.filter(
+      (s) =>
+        s.student_id.toLowerCase().includes(searchTerm) ||
+        s.name.toLowerCase().includes(searchTerm) ||
+        s.email.toLowerCase().includes(searchTerm) ||
+        (s.department && s.department.toLowerCase().includes(searchTerm)),
+    );
+    displayStudents(filtered);
+  }, 150);
 }
 
 function showAddStudentForm() {
@@ -400,6 +376,13 @@ function editStudent(studentId) {
 async function addStudent(event) {
   event.preventDefault();
 
+  if (operationInProgress) {
+    showNotification("Please wait...", "warning");
+    return;
+  }
+
+  operationInProgress = true;
+
   const student = {
     student_id: document.getElementById("studentId").value,
     name: document.getElementById("studentName").value,
@@ -411,43 +394,62 @@ async function addStudent(event) {
 
   const isEdit = !!editingStudent;
   hideAddStudentForm();
-  showNotification(
-    isEdit ? "Updating student..." : "Adding student...",
-    "info",
-  );
 
-  let result;
-  if (isEdit) {
-    result = await ipcRenderer.invoke("update-student", student);
-  } else {
-    result = await ipcRenderer.invoke("add-student", student);
-  }
-
-  if (result.success) {
-    showNotification(isEdit ? "Student updated!" : "Student added!", "success");
-
-    markForUpdate("statistics", "students", "dashboard");
-  } else {
-    showNotification(`Error: ${result.error}`, "error");
+  try {
+    let result;
     if (isEdit) {
-      editStudent(student.student_id);
+      result = await ipcRenderer.invoke("update-student", student);
     } else {
-      showAddStudentForm();
+      result = await ipcRenderer.invoke("add-student", student);
     }
+
+    if (result.success) {
+      showNotification(
+        isEdit ? "Student updated!" : "Student added!",
+        "success",
+      );
+
+      // Reload only necessary data
+      await Promise.all([loadStudents(), loadStatistics()]);
+      updateDashboard();
+    } else {
+      showNotification(`Error: ${result.error}`, "error");
+      if (isEdit) {
+        editStudent(student.student_id);
+      } else {
+        showAddStudentForm();
+      }
+    }
+  } catch (error) {
+    showNotification(`Error: ${error.message}`, "error");
+  } finally {
+    operationInProgress = false;
   }
 }
 
 async function deleteStudent(studentId) {
+  if (operationInProgress) {
+    showNotification("Please wait...", "warning");
+    return;
+  }
+
   if (confirm("Are you sure you want to delete this student?")) {
-    showNotification("Deleting student...", "info");
+    operationInProgress = true;
 
-    const result = await ipcRenderer.invoke("delete-student", studentId);
+    try {
+      const result = await ipcRenderer.invoke("delete-student", studentId);
 
-    if (result.success) {
-      showNotification("Student deleted!", "success");
-      markForUpdate("statistics", "students", "dashboard");
-    } else {
-      showNotification(`Error: ${result.error}`, "error");
+      if (result.success) {
+        showNotification("Student deleted!", "success");
+        await Promise.all([loadStudents(), loadStatistics()]);
+        updateDashboard();
+      } else {
+        showNotification(`Error: ${result.error}`, "error");
+      }
+    } catch (error) {
+      showNotification(`Error: ${error.message}`, "error");
+    } finally {
+      operationInProgress = false;
     }
   }
 }
@@ -513,15 +515,23 @@ function displayBooks(books) {
 }
 
 function filterBooks() {
-  const searchTerm = document.getElementById("bookSearch").value.toLowerCase();
-  const filtered = booksData.filter(
-    (b) =>
-      b.isbn.toLowerCase().includes(searchTerm) ||
-      b.title.toLowerCase().includes(searchTerm) ||
-      b.author.toLowerCase().includes(searchTerm) ||
-      (b.category && b.category.toLowerCase().includes(searchTerm)),
-  );
-  displayBooks(filtered);
+  if (searchTimers.books) {
+    clearTimeout(searchTimers.books);
+  }
+
+  searchTimers.books = setTimeout(() => {
+    const searchTerm = document
+      .getElementById("bookSearch")
+      .value.toLowerCase();
+    const filtered = booksData.filter(
+      (b) =>
+        b.isbn.toLowerCase().includes(searchTerm) ||
+        b.title.toLowerCase().includes(searchTerm) ||
+        b.author.toLowerCase().includes(searchTerm) ||
+        (b.category && b.category.toLowerCase().includes(searchTerm)),
+    );
+    displayBooks(filtered);
+  }, 150);
 }
 
 function showAddBookForm() {
@@ -560,6 +570,13 @@ function editBook(isbn) {
 async function addBook(event) {
   event.preventDefault();
 
+  if (operationInProgress) {
+    showNotification("Please wait...", "warning");
+    return;
+  }
+
+  operationInProgress = true;
+
   const totalCopies = parseInt(
     document.getElementById("bookTotalCopies").value,
   );
@@ -578,40 +595,57 @@ async function addBook(event) {
 
   const isEdit = !!editingBook;
   hideAddBookForm();
-  showNotification(isEdit ? "Updating book..." : "Adding book...", "info");
 
-  let result;
-  if (isEdit) {
-    result = await ipcRenderer.invoke("update-book", book);
-  } else {
-    result = await ipcRenderer.invoke("add-book", book);
-  }
-
-  if (result.success) {
-    showNotification(isEdit ? "Book updated!" : "Book added!", "success");
-
-    markForUpdate("statistics", "books", "dashboard");
-  } else {
-    showNotification(`Error: ${result.error}`, "error");
+  try {
+    let result;
     if (isEdit) {
-      editBook(book.isbn);
+      result = await ipcRenderer.invoke("update-book", book);
     } else {
-      showAddBookForm();
+      result = await ipcRenderer.invoke("add-book", book);
     }
+
+    if (result.success) {
+      showNotification(isEdit ? "Book updated!" : "Book added!", "success");
+      await Promise.all([loadBooks(), loadStatistics()]);
+      updateDashboard();
+    } else {
+      showNotification(`Error: ${result.error}`, "error");
+      if (isEdit) {
+        editBook(book.isbn);
+      } else {
+        showAddBookForm();
+      }
+    }
+  } catch (error) {
+    showNotification(`Error: ${error.message}`, "error");
+  } finally {
+    operationInProgress = false;
   }
 }
 
 async function deleteBook(isbn) {
+  if (operationInProgress) {
+    showNotification("Please wait...", "warning");
+    return;
+  }
+
   if (confirm("Are you sure you want to delete this book?")) {
-    showNotification("Deleting book...", "info");
+    operationInProgress = true;
 
-    const result = await ipcRenderer.invoke("delete-book", isbn);
+    try {
+      const result = await ipcRenderer.invoke("delete-book", isbn);
 
-    if (result.success) {
-      showNotification("Book deleted!", "success");
-      markForUpdate("statistics", "books", "dashboard");
-    } else {
-      showNotification(`Error: ${result.error}`, "error");
+      if (result.success) {
+        showNotification("Book deleted!", "success");
+        await Promise.all([loadBooks(), loadStatistics()]);
+        updateDashboard();
+      } else {
+        showNotification(`Error: ${result.error}`, "error");
+      }
+    } catch (error) {
+      showNotification(`Error: ${error.message}`, "error");
+    } finally {
+      operationInProgress = false;
     }
   }
 }
@@ -632,21 +666,34 @@ function hideIssueBookModal() {
 async function issueBook(event) {
   event.preventDefault();
 
+  if (operationInProgress) {
+    showNotification("Please wait...", "warning");
+    return;
+  }
+
+  operationInProgress = true;
+
   const transaction = {
     student_id: document.getElementById("issueStudentId").value,
     isbn: document.getElementById("issueBookIsbn").value,
   };
 
   hideIssueBookModal();
-  showNotification("Issuing book...", "info");
 
-  const result = await ipcRenderer.invoke("issue-book", transaction);
+  try {
+    const result = await ipcRenderer.invoke("issue-book", transaction);
 
-  if (result.success) {
-    showNotification("Book issued!", "success");
-    markForUpdate("statistics", "books", "transactions", "dashboard");
-  } else {
-    showNotification(`Error: ${result.error}`, "error");
+    if (result.success) {
+      showNotification("Book issued!", "success");
+      await Promise.all([loadBooks(), loadTransactions(), loadStatistics()]);
+      updateDashboard();
+    } else {
+      showNotification(`Error: ${result.error}`, "error");
+    }
+  } catch (error) {
+    showNotification(`Error: ${error.message}`, "error");
+  } finally {
+    operationInProgress = false;
   }
 }
 
@@ -703,62 +750,75 @@ function displayTransactions(transactions) {
 }
 
 function filterTransactions() {
-  const searchTerm = document
-    .getElementById("transactionSearch")
-    .value.toLowerCase();
-  const filtered = transactionsData.filter(
-    (t) =>
-      t.student_id.toLowerCase().includes(searchTerm) ||
-      (t.student_name && t.student_name.toLowerCase().includes(searchTerm)) ||
-      (t.book_title && t.book_title.toLowerCase().includes(searchTerm)),
-  );
-  displayTransactions(filtered);
+  if (searchTimers.transactions) {
+    clearTimeout(searchTimers.transactions);
+  }
+
+  searchTimers.transactions = setTimeout(() => {
+    const searchTerm = document
+      .getElementById("transactionSearch")
+      .value.toLowerCase();
+    const filtered = transactionsData.filter(
+      (t) =>
+        t.student_id.toLowerCase().includes(searchTerm) ||
+        (t.student_name && t.student_name.toLowerCase().includes(searchTerm)) ||
+        (t.book_title && t.book_title.toLowerCase().includes(searchTerm)),
+    );
+    displayTransactions(filtered);
+  }, 150);
 }
 
 async function returnBook(transactionId) {
+  if (operationInProgress) {
+    showNotification("Please wait...", "warning");
+    return;
+  }
+
   if (confirm("Mark this book as returned?")) {
-    showNotification("Processing return...", "info");
+    operationInProgress = true;
 
-    const transaction = transactionsData.find((t) => t.id === transactionId);
-    if (transaction) {
-      transaction.status = "returned";
-      transaction.return_date = new Date().toISOString();
-      displayTransactions(transactionsData);
-    }
+    try {
+      const result = await ipcRenderer.invoke("return-book", transactionId);
 
-    const result = await ipcRenderer.invoke("return-book", transactionId);
-
-    if (result.success) {
-      showNotification("Book returned!", "success");
-
-      markForUpdate("statistics", "books", "transactions");
-    } else {
-      showNotification(`Error: ${result.error}`, "error");
-      loadTransactions();
+      if (result.success) {
+        showNotification("Book returned!", "success");
+        await Promise.all([loadTransactions(), loadBooks(), loadStatistics()]);
+      } else {
+        showNotification(`Error: ${result.error}`, "error");
+      }
+    } catch (error) {
+      showNotification(`Error: ${error.message}`, "error");
+    } finally {
+      operationInProgress = false;
     }
   }
 }
 
 async function deleteTransaction(transactionId) {
+  if (operationInProgress) {
+    showNotification("Please wait...", "warning");
+    return;
+  }
+
   if (confirm("Are you sure you want to delete this transaction record?")) {
-    showNotification("Deleting transaction...", "info");
+    operationInProgress = true;
 
-    const index = transactionsData.findIndex((t) => t.id === transactionId);
-    if (index !== -1) {
-      transactionsData.splice(index, 1);
-      displayTransactions(transactionsData);
-    }
+    try {
+      const result = await ipcRenderer.invoke(
+        "delete-transaction",
+        transactionId,
+      );
 
-    const result = await ipcRenderer.invoke(
-      "delete-transaction",
-      transactionId,
-    );
-
-    if (result.success) {
-      showNotification("Transaction deleted!", "success");
-    } else {
-      showNotification(`Error: ${result.error}`, "error");
-      loadTransactions();
+      if (result.success) {
+        showNotification("Transaction deleted!", "success");
+        await loadTransactions();
+      } else {
+        showNotification(`Error: ${result.error}`, "error");
+      }
+    } catch (error) {
+      showNotification(`Error: ${error.message}`, "error");
+    } finally {
+      operationInProgress = false;
     }
   }
 }
