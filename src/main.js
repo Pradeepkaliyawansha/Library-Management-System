@@ -312,7 +312,7 @@ function createMenu() {
               type: "info",
               title: "About Library Management System",
               message: "Library Management System",
-              detail: `Version: ${app.getVersion()}\n\nA comprehensive library management solution for universities.\n\nDeveloped by: Pradeep Kaliyawansha\nLicense: MIT`,
+              detail: `Version: ${app.getVersion()}\n\nA comprehensive library management solution for universities.\n\nLicense: MIT`,
               buttons: ["OK"],
             });
           },
